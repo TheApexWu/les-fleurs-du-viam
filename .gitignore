@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 photo*.jpg
 .venv/
+pose_trace.csv
+auto_poses.json
+recordings/

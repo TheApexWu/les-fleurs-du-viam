@@ -51,21 +51,38 @@ class FlowerBot:
 
     # ── primitives ─────────────────────────────────────────────────────────
     async def grip(self, width: int):
-        # The xArm gripper takes a width through the arm's DoCommand, so stems are held at a set
-        # width instead of grab() closing as hard as it can. VERIFY: on the arm vs gripper component.
+        # Width goes through the arm's DoCommand (checked 16 Oct: the gripper component returns
+        # nothing for get_gripper), so stems are held at a set width, not grab()'s full force.
         await self.arm.do_command({"setup_gripper": True, "move_gripper": float(width)})
 
+    async def gripper_width(self) -> float:
+        return (await self.arm.do_command({"get_gripper": True}))["gripper_position"]
+
+    async def speed(self, fast: bool):
+        await self.arm.do_command({"set_speed": K.FAST_DEG_S if fast else K.SLOW_DEG_S})
+
+    async def setup(self):
+        await self.arm.do_command({"set_acceleration": K.ACCEL_DEG_S2})
+        await self.arm.do_command({"set_gripper_speed": K.GRIP_SPEED})
+        await self.speed(fast=True)
+
+    def hub(self) -> G.P:
+        return G.P(K.VASE["x"], K.VASE["y"], K.TRAVEL_Z, theta=K.WRIST_DEG)
+
     def obstacles(self):
-        """Placed stems as boxes, so the planner routes around them (Viam 101, WorldState)."""
-        ken = K.taught()["kenzan"]
-        geoms = []
+        """Vase plus placed stems as boxes, so the planner routes around them (Viam 101, WorldState)."""
+        vc, vd = K.VASE_BOX["center"], K.VASE_BOX["dims"]
+        geoms = [GeometriesInFrame(reference_frame="world", geometries=[Geometry(
+            center=Pose(x=vc[0], y=vc[1], z=vc[2], o_z=1.0),
+            box=RectangularPrism(dims_mm=Vector3(x=vd[0], y=vd[1], z=vd[2])), label="vase")])]
         for i, (pl, h) in enumerate(self.placed):
+            ken = K.taught()["kenzan"]
             center, dims = G.stem_obstacle((ken["x"], ken["y"], ken["z"]), pl.x, pl.y,
                                            pl.tilt_deg, pl.azimuth_deg, h)
             geoms.append(GeometriesInFrame(reference_frame="world", geometries=[Geometry(
                 center=pose(center), box=RectangularPrism(dims_mm=Vector3(x=dims[0], y=dims[1], z=dims[2])),
                 label=f"stem-{i}")]))
-        return WorldState(obstacles=geoms) if geoms else None
+        return WorldState(obstacles=geoms)
 
     async def move(self, p, straight=False):
         constraints = (Constraints(linear_constraint=[LinearConstraint(line_tolerance_mm=2.0)])
@@ -92,14 +109,60 @@ class FlowerBot:
         await self.grip(K.GRIP_STEM)
         print(await self.arm.do_command({"get_gripper": True}))
 
+    async def grip_calibrate(self):
+        """Close in small steps on a stem held in the open fingers; the width where the fingers
+        stop following the command is the stem. Suggests GRIP_STEM a little inside that."""
+        await self.arm.do_command({"set_gripper_speed": K.GRIP_SPEED})
+        await self.grip(K.GRIP_OPEN)
+        for w in range(K.GRIP_OPEN, 0, -20):
+            await self.grip(w)
+            got = await self.gripper_width()
+            if got - w > 15:
+                print(f"contact at {got:.0f}; set GRIP_STEM = {got - 10:.0f} in config.py")
+                return
+        print("closed fully: nothing between the fingers?")
+
     async def pick(self, slot):
         s = K.taught()[f"slot{slot}"]
-        above = G.P(s["x"], s["y"], s["z"] + K.LIFT_MM)
+        at = G.P(s["x"], s["y"], s["z"], theta=K.WRIST_DEG)
+        above = G.P(s["x"], s["y"], s["z"] + K.LIFT_MM, theta=K.WRIST_DEG)
         await self.grip(K.GRIP_OPEN)
+        await self.speed(fast=True)
         await self.move(above)
-        await self.move(G.P(s["x"], s["y"], s["z"]), straight=True)
+        await self.speed(fast=False)
+        await self.move(at, straight=True)
         await self.grip(K.GRIP_STEM)
+        if await self.gripper_width() < K.GRIP_EMPTY_MAX:
+            await self.grip(K.GRIP_OPEN)
+            await self.move(above, straight=True)
+            raise RuntimeError(f"slot {slot}: fingers closed on nothing")
         await self.move(above, straight=True)
+        await self.speed(fast=True)
+
+    async def drop(self, lean_az=0.0, tilt=15.0):
+        """Hub -> along the stem axis to just above the rim -> release -> back out -> hub."""
+        pre, at = G.vase_drop_poses((K.VASE["x"], K.VASE["y"]), K.VASE["rim_z"], K.VASE["rim_r"],
+                                    lean_az, tilt, K.WRIST_DEG,
+                                    min_grip_z=(K.VASE_FLOOR_Z + K.VASE_STEM_BELOW_GRIP_MM + 20)
+                                    if K.VASE_FLOOR_Z is not None else float("-inf"))
+        await self.move(self.hub())
+        await self.move(pre)
+        await self.speed(fast=False)
+        await self.move(at, straight=True)
+        await self.grip(K.GRIP_STEM + K.GRIP_RELEASE_MARGIN)
+        await self.move(pre, straight=True)
+        await self.speed(fast=True)
+        await self.move(self.hub())
+
+    async def vase_one(self, slot=0, lean_az=0, tilt=15):
+        """Milestone 1 for the vase: one stem from the pitcher into the vase."""
+        await self.setup()
+        await self.pick(slot)
+        await self.drop(float(lean_az), float(tilt))
+
+    async def go_hub(self):
+        await self.setup()
+        await self.move(self.hub())
 
     async def place(self, pl: C.Placement, stem_height_mm=250.0):
         ken = K.taught()["kenzan"]
@@ -144,7 +207,8 @@ class FlowerBot:
 
 
 STEPS = {name: getattr(FlowerBot, name) for name in
-         ("resources", "teach", "grip_test", "pick", "insert_one", "sogetsu", "photo", "say")}
+         ("resources", "teach", "grip_test", "grip_calibrate", "pick", "go_hub", "vase_one",
+          "insert_one", "sogetsu", "photo", "say")}
 
 
 async def main(verb, *args):

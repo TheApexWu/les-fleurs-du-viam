@@ -50,6 +50,38 @@ def test_stem_tip_lands_at_target_depth():
     assert (ins.x, ins.y, ins.z) == (505, -5, 100 - 15 + 80)
 
 
+
+def test_vase_drop_keeps_gripper_above_rim_and_comes_in_along_the_stem():
+    pre, drop = G.vase_drop_poses((300, -283), rim_z=420, rim_r=59, lean_az_deg=90, tilt_deg=20, wrist_deg=-15)
+    assert drop.z > 420 and pre.z > drop.z
+    d = (drop.x - pre.x, drop.y - pre.y, drop.z - pre.z)
+    norm = math.sqrt(sum(c * c for c in d))
+    assert all(math.isclose(d[i] / norm, (drop.o_x, drop.o_y, drop.o_z)[i], abs_tol=1e-9) for i in range(3))
+
+
+def test_vase_drop_crosses_the_rim_on_the_lean_side():
+    _, drop = G.vase_drop_poses((300, -283), 420, 59, lean_az_deg=90, tilt_deg=20, wrist_deg=0)
+    # stem axis back down to the rim plane lands inside the opening, toward +y (azimuth 90)
+    t = (420 - drop.z) / drop.o_z
+    cross = (drop.x + t * drop.o_x, drop.y + t * drop.o_y)
+    assert math.hypot(cross[0] - 300, cross[1] + 283) < 59
+    assert cross[1] > -283
+    assert drop.o_y < 0  # tip heads away from the lean, so the top rests on the +y rim
+
+
+def test_vertical_drop_is_straight_down():
+    pre, drop = G.vase_drop_poses((0, 0), 100, 50, lean_az_deg=0, tilt_deg=0, wrist_deg=0)
+    assert (drop.o_x, drop.o_y, drop.o_z) == (0.0, 0.0, -1.0) and math.isclose(pre.x, drop.x)
+
+
+
+def test_long_stem_is_released_high_enough_to_clear_the_vase_floor():
+    _, low = G.vase_drop_poses((0, 0), 420, 59, 0, 20, 0)
+    _, high = G.vase_drop_poses((0, 0), 420, 59, 0, 20, 0, min_grip_z=600)
+    assert low.z < 600 and math.isclose(high.z, 600)
+    assert (high.o_x, high.o_y, high.o_z) == (low.o_x, low.o_y, low.o_z)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

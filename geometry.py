@@ -51,3 +51,23 @@ def stem_obstacle(kenzan_center: tuple[float, float, float], x: float, y: float,
     base = (kenzan_center[0] + x, kenzan_center[1] + y, kenzan_center[2])
     mid = tuple(base[i] - ax[i] * height_mm / 2 for i in range(3))  # -ax points up the stem
     return P(*mid, o_x=-ax[0], o_y=-ax[1], o_z=-ax[2]), (40.0, 40.0, height_mm)
+
+
+def vase_drop_poses(vase_xy: tuple[float, float], rim_z: float, rim_r: float, lean_az_deg: float,
+                    tilt_deg: float, wrist_deg: float, rim_frac: float = 0.6,
+                    grip_above_rim_mm: float = 40.0, approach_mm: float = 60.0,
+                    min_grip_z: float = float("-inf")) -> tuple[P, P]:
+    """(pre, drop) gripper poses that let a held stem fall into a vase leaning toward `lean_az_deg`.
+
+    The stem crosses the rim plane `rim_frac` of the way out toward the lean side, already tilted,
+    so it settles against that side of the rim. The gripper stays `grip_above_rim_mm` up the stem
+    from the rim plane, above the vase obstacle, and comes in along the stem axis.
+    """
+    ax = axis(tilt_deg, lean_az_deg + 180.0)  # the tip points away from the lean
+    a = math.radians(lean_az_deg)
+    cross = (vase_xy[0] + rim_frac * rim_r * math.cos(a), vase_xy[1] + rim_frac * rim_r * math.sin(a), rim_z)
+    grip = tuple(cross[i] - grip_above_rim_mm * ax[i] for i in range(3))
+    if grip[2] < min_grip_z:  # a long stem would hit the vase floor first: release higher up the axis
+        grip = tuple(grip[i] - (min_grip_z - grip[2]) / -ax[2] * ax[i] for i in range(3))
+    pre = tuple(grip[i] - approach_mm * ax[i] for i in range(3))
+    return P(*pre, *ax, theta=wrist_deg), P(*grip, *ax, theta=wrist_deg)
