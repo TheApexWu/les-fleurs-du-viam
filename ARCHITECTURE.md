@@ -10,13 +10,12 @@ flowchart LR
     D["dashboard.py<br/>browser teleop :8765"]
     T["teleop.py<br/>terminal teleop"]
     C["fleurs_core.py<br/>limits, one move at a time,<br/>per-move log + 5 Hz trace"]
-    F["flowers.py<br/>pick / drop / fill steps<br/>plan-only check before every move"]
+    F["flowers.py<br/>teach, plan_check, photo<br/>plan-only check before every move"]
+    RP["replay.py<br/>plays back marked moments"]
     R["recorder.py<br/>snapshots while hand-guiding"]
     A["ai.py<br/>Claude planner + blind critic"]
-    G["geometry.py / composition.py<br/>pose maths, stem-in-vase model"]
     D --> C
     T --> C
-    F --> G
     F --> A
   end
 
@@ -41,6 +40,7 @@ flowchart LR
   F -- "motion.do_command plan, then motion.move" --> MOT
   F --> CAM
   R --> ARM
+  RP --> ARM
   MOT --> ARM
   MOT --> OBS
   APP <--> Robot
@@ -64,30 +64,22 @@ flowchart LR
 
 **Open question:** our arm-measured vase is at (300, -283), rim z 420. The team's `vase` frame is at (360, 234). Either the vase moved to the +y side or one of the two is wrong. `config.VASE` must match where the vase actually is, or the obstacle box protects the wrong spot.
 
-## 3. One pick-and-place, step by step (planned flow for `vase_one`)
+## 3. One pick-and-place by replay (planned, not run yet)
 
 ```mermaid
 sequenceDiagram
   participant Op as Operator
-  participant F as flowers.py
-  participant M as motion service
+  participant D as dashboard
+  participant R as replay.py
   participant A as arm + gripper
-  Op->>F: python flowers.py vase_one 0
-  F->>F: best_lean(): score 6 lean directions by clearance to placed stems, blooms, gripper
-  F->>A: setup: speeds, gripper speed
-  loop every move
-    F->>M: do_command {"plan": MoveRequest}  (dry run, never moves)
-    alt no full plan
-      M-->>F: error or plan_partialwp
-      F-->>Op: refuse, nothing moved
-    else plan OK
-      F->>M: motion.move (same request)
-      M->>A: execute
-    end
+  Op->>D: drive the pick by hand, press M at approach, grasp, lift, over vase, release
+  D->>D: log each mark with its 6 joint angles and gripper width
+  Op->>R: python replay.py <log> [base offset]
+  loop each mark in order
+    R->>A: move_to_joint_positions (joint 1 + offset)
+    R->>A: gripper to the recorded width
   end
-  Note over F,A: pick: above slot -> straight down (slow) -> close -> check width -> straight up
-  Note over F,A: drop: hub at travel height -> along stem axis to 10 cm above rim -> open -> back out -> hub
-  F->>F: record the placed stem as obstacles (stem box + bloom cube) for the next drop
+  Note over R,A: any error or Ctrl-C calls arm.stop()
 ```
 
 ## 4. Teleop to automation (the path we're on)
