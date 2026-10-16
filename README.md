@@ -4,6 +4,8 @@ A robot arm that arranges flowers to express a feeling. You type "gratitude" or 
 
 Viam hackathon, 16-17 Oct 2026, robot `armfarm12` (xArm, wrist camera, gripper).
 
+**Today's plan, mental model and task list: [TODAY.md](TODAY.md).**
+
 ## Where we are (Fri 16 Oct, afternoon)
 
 Done:
