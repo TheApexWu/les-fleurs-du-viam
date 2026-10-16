@@ -1,23 +1,23 @@
 """Keyboard teleop for the arm, logging every move so a demonstration can be replayed later.
 
-  python teleop.py            exit manual mode first; someone at the stop button for the first run
+  python teleop.py            terminal version; dashboard.py is the browser version of the same thing
 
   W/S  x +/-        A/D  y +/-        R/F  z +/-        Q/E  wrist spin -/+ 5 deg
   O/C  gripper open/close a step      G  gripper to GRIP_STEM (gentle hold)
   Tab  step 20 mm <-> 5 mm            M  mark this moment with a label
   Space  stop                         X  quit
 
-Every key is one move: read the pose, add the step, check the limits, move, read back. Keys pressed
-while a move runs are thrown away, so a held key can't queue moves that keep going after release.
+Every key is one move: read the pose, add the step, check the limits, move, read back. Keys arriving
+while a move runs are refused, so a held key can't queue moves that keep going after release.
 Each line of recordings/teleop-<time>.jsonl holds the command and the pose and joints actually reached.
+A continuous trace (pose, joints, gripper, ~5x/s, also during moves) goes to recordings/teleop-<time>-trace.csv.
 """
 import asyncio
+import csv
 import json
 import math
 import sys
-import termios
 import time
-import tty
 from pathlib import Path
 
 import config as K
@@ -27,6 +27,8 @@ SPIN_DEG = 5.0
 GRIP_STEP = 50
 ACCURACY_MM = 2.0
 TELEOP_DEG_S = 15.0
+TRACE_HZ = 5.0
+FIELDS = ("x", "y", "z", "o_x", "o_y", "o_z", "theta")
 
 # Safe box, from the cell's obstacle config and the vase measured on 16 Oct.
 FLOOR_Z = K.TABLE_TOP_Z + 30.0
@@ -52,7 +54,127 @@ def clamp_ok(x: float, y: float, z: float) -> tuple[bool, str]:
     return True, ""
 
 
+class Jogger:
+    """One arm, one log, one move at a time. Shared by the terminal and the dashboard."""
+
+    def __init__(self, arm):
+        self.arm = arm
+        self.step_i = 0
+        self.busy = asyncio.Lock()
+        path = Path(__file__).parent / "recordings" / f"teleop-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+        path.parent.mkdir(exist_ok=True)
+        self.log_path, self.log = path, path.open("a")
+        self.trace_path = path.with_name(path.stem + "-trace.csv")
+        self.last = {}
+        self.latest = None  # newest trace sample, so the dashboard reads state without extra robot calls
+        self._trace_task = None
+
+    async def start(self):
+        await self.arm.do_command({"set_speed": TELEOP_DEG_S})
+        await self.arm.do_command({"set_gripper_speed": K.GRIP_SPEED})
+        self._trace_task = asyncio.create_task(self._trace())
+
+    async def _trace(self):
+        """Continuous record of where the arm is, including mid-move, independent of key presses."""
+        with self.trace_path.open("w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(("t", "busy") + FIELDS + tuple(f"j{i}" for i in range(1, 7)) + ("gripper",))
+            n = 0
+            while True:
+                tick = time.time()
+                try:
+                    pose, joints, g = await self.snapshot()
+                except Exception as e:  # noqa: BLE001 - a dropped read must not end the recording
+                    w.writerow((round(tick, 3), "read_failed", type(e).__name__))
+                    await asyncio.sleep(1.0)
+                    continue
+                self.latest = {"pose": pose, "joints": joints, "gripper": g, "t": tick}
+                w.writerow([round(tick, 3), int(self.busy.locked())] + [pose[k] for k in FIELDS] + joints + [g])
+                n += 1
+                if n % 25 == 0:
+                    f.flush()
+                await asyncio.sleep(max(0.0, 1 / TRACE_HZ - (time.time() - tick)))
+
+    def close(self):
+        if self._trace_task:
+            self._trace_task.cancel()
+        self.log.close()
+
+    def write(self, entry):
+        self.log.write(json.dumps(dict(entry, t=round(time.time(), 3))) + "\n")
+        self.log.flush()
+
+    async def snapshot(self):
+        p, j = await asyncio.gather(self.arm.get_end_position(), self.arm.get_joint_positions())
+        g = (await self.arm.do_command({"get_gripper": True})).get("gripper_position")
+        pose = {k: round(getattr(p, k), 3) for k in ("x", "y", "z", "o_x", "o_y", "o_z", "theta")}
+        return pose, [round(v, 3) for v in j.values], g
+
+    async def stop(self) -> str:
+        await self.arm.stop()  # never waits for the lock: stop must always get through
+        self.write({"cmd": "stop"})
+        return "STOP"
+
+    async def handle(self, key: str, label: str = "") -> str:
+        """Run one key. Returns a one-line message for the operator."""
+        key = key.lower()
+        if key == " ":
+            return await self.stop()
+        if key == "\t":
+            self.step_i = 1 - self.step_i
+            return f"step {STEPS_MM[self.step_i]:.0f} mm"
+        if self.busy.locked():
+            return "busy: previous move still running, key ignored"
+        async with self.busy:
+            try:
+                return await self._run(key, label)
+            except Exception as e:  # noqa: BLE001 - e.g. an unreachable target; stop, log, keep the session
+                await self.arm.stop()
+                self.write({"cmd": {"key": key}, "error": f"{type(e).__name__}: {e}"[:300]})
+                return f"error, arm stopped: {type(e).__name__}: {str(e)[:120]}"
+
+    async def _run(self, key: str, label: str) -> str:
+        from viam.proto.common import Pose
+        pose, joints, g = await self.snapshot()
+        if key in MOVES:
+            d = [c * STEPS_MM[self.step_i] for c in MOVES[key]]
+            target = dict(pose, x=pose["x"] + d[0], y=pose["y"] + d[1], z=pose["z"] + d[2])
+            ok, why = clamp_ok(target["x"], target["y"], target["z"])
+            if not ok:
+                self.write({"cmd": {"key": key, "delta": d}, "refused": why, "pose": pose})
+                return f"refused: {why}"
+            cmd = {"key": key, "delta": d}
+        elif key in ("q", "e"):
+            target = dict(pose, theta=pose["theta"] + (SPIN_DEG if key == "e" else -SPIN_DEG))
+            cmd = {"key": key, "d_theta": target["theta"] - pose["theta"]}
+        elif key in ("o", "c", "g"):
+            width = K.GRIP_STEM if key == "g" else (g or 0) + (GRIP_STEP if key == "o" else -GRIP_STEP)
+            width = float(max(0, min(850, width)))
+            await self.arm.do_command({"setup_gripper": True, "move_gripper": width})
+            pose, joints, g2 = await self.snapshot()
+            self.write({"cmd": {"key": key, "gripper_target": width}, "pose": pose, "joints": joints, "gripper": g2})
+            self.last = {"pose": pose, "gripper": g2}
+            return f"gripper {g:.0f} -> {g2:.0f}"
+        elif key == "m":
+            self.write({"mark": label.strip(), "pose": pose, "joints": joints, "gripper": g})
+            return f"marked '{label.strip()}' at x={pose['x']:.0f} y={pose['y']:.0f} z={pose['z']:.0f}"
+        else:
+            return f"unknown key {key!r}"
+
+        await self.arm.move_to_position(Pose(**target))
+        reached, joints, g = await self.snapshot()
+        err = math.dist((target["x"], target["y"], target["z"]), (reached["x"], reached["y"], reached["z"]))
+        self.write({"cmd": cmd, "target": target, "pose": reached, "joints": joints, "gripper": g,
+                    "err_mm": round(err, 2)})
+        self.last = {"pose": reached, "gripper": g, "err_mm": round(err, 2)}
+        flag = "  <-- off target" if err > ACCURACY_MM else ""
+        return (f"{key}: x={reached['x']:.0f} y={reached['y']:.0f} z={reached['z']:.0f} "
+                f"theta={reached['theta']:.0f}  err {err:.1f} mm{flag}")
+
+
 def read_key() -> str:
+    import termios
+    import tty
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
@@ -62,99 +184,29 @@ def read_key() -> str:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
-def drop_buffered_keys():
-    termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)
-
-
 async def main():
+    import termios
     from viam.components.arm import Arm
-    from viam.proto.common import Pose
     from flowers import connect
 
     robot = await connect()
-    arm = Arm.from_robot(robot, K.ARM)
-    log_path = Path(__file__).parent / "recordings" / f"teleop-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
-    log_path.parent.mkdir(exist_ok=True)
-    log = log_path.open("a")
-    step_i = 0
-
-    async def snapshot():
-        p, j = await asyncio.gather(arm.get_end_position(), arm.get_joint_positions())
-        g = (await arm.do_command({"get_gripper": True})).get("gripper_position")
-        pose = {k: round(getattr(p, k), 3) for k in ("x", "y", "z", "o_x", "o_y", "o_z", "theta")}
-        return pose, [round(v, 3) for v in j.values], g
-
-    def write(entry):
-        log.write(json.dumps(entry) + "\n")
-        log.flush()
-
-    async def grip(width):
-        await arm.do_command({"setup_gripper": True, "move_gripper": float(max(0, min(850, width)))})
-
+    jog = Jogger(Arm.from_robot(robot, K.ARM))
     try:
-        await arm.do_command({"set_speed": TELEOP_DEG_S})
-        await arm.do_command({"set_gripper_speed": K.GRIP_SPEED})
+        await jog.start()
         print(__doc__.split("\n\n")[1])
-        print(f"logging to {log_path}\n")
+        print(f"logging to {jog.log_path}\n")
         while True:
-            key = (await asyncio.to_thread(read_key)).lower()
-            if key in ("x", "\x03"):
+            key = await asyncio.to_thread(read_key)
+            if key.lower() in ("x", "\x03"):
                 break
-            if key == " ":
-                await arm.stop()
-                print("STOP")
-                write({"t": time.time(), "cmd": "stop"})
-                continue
-            if key == "\t":
-                step_i = 1 - step_i
-                print(f"step {STEPS_MM[step_i]:.0f} mm")
-                continue
-
-            pose, joints, g = await snapshot()
-            cmd = None
-            if key in MOVES:
-                d = [c * STEPS_MM[step_i] for c in MOVES[key]]
-                target = dict(pose, x=pose["x"] + d[0], y=pose["y"] + d[1], z=pose["z"] + d[2])
-                ok, why = clamp_ok(target["x"], target["y"], target["z"])
-                if not ok:
-                    print(f"refused: {why}")
-                    write({"t": time.time(), "cmd": {"key": key, "delta": d}, "refused": why, "pose": pose})
-                    continue
-                cmd = {"key": key, "delta": d}
-            elif key in ("q", "e"):
-                target = dict(pose, theta=pose["theta"] + (SPIN_DEG if key == "e" else -SPIN_DEG))
-                cmd = {"key": key, "d_theta": target["theta"] - pose["theta"]}
-            elif key in ("o", "c", "g"):
-                width = K.GRIP_STEM if key == "g" else (g or 0) + (GRIP_STEP if key == "o" else -GRIP_STEP)
-                await grip(width)
-                pose, joints, g2 = await snapshot()
-                print(f"gripper {g:.0f} -> {g2:.0f}")
-                write({"t": time.time(), "cmd": {"key": key, "gripper_target": width}, "pose": pose,
-                       "joints": joints, "gripper": g2})
-                drop_buffered_keys()
-                continue
-            elif key == "m":
-                label = await asyncio.to_thread(input, "label for this moment: ")
-                write({"t": time.time(), "mark": label.strip(), "pose": pose, "joints": joints, "gripper": g})
-                print(f"marked '{label.strip()}' at x={pose['x']:.0f} y={pose['y']:.0f} z={pose['z']:.0f}")
-                continue
-            else:
-                continue
-
-            await arm.move_to_position(Pose(**target))
-            reached, joints, g = await snapshot()
-            err = math.dist((target["x"], target["y"], target["z"]), (reached["x"], reached["y"], reached["z"]))
-            flag = "  <-- off target" if err > ACCURACY_MM else ""
-            print(f"{key}: x={reached['x']:.0f} y={reached['y']:.0f} z={reached['z']:.0f} "
-                  f"theta={reached['theta']:.0f}  err {err:.1f} mm{flag}")
-            write({"t": time.time(), "cmd": cmd, "target": target, "pose": reached, "joints": joints,
-                   "gripper": g, "err_mm": round(err, 2)})
-            drop_buffered_keys()
+            label = await asyncio.to_thread(input, "label for this moment: ") if key.lower() == "m" else ""
+            print(await jog.handle(key, label))
+            termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)  # drop keys pressed during the move
     except BaseException:
-        await arm.stop()
+        await jog.arm.stop()
         raise
     finally:
-        log.close()
+        jog.close()
         await robot.close()
 
 

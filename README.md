@@ -35,6 +35,18 @@ python3 -m pytest -q tests       # offline, no robot
 
 Teaching a pose: start `python recorder.py`, put the arm in manual mode (support it from below before pressing the button), move it, hold still for a second at each spot. Then `python recorder.py promote p12 slot0 --down -15`.
 
+## Driving the arm by hand (teleop)
+
+```
+python dashboard.py      # then open http://localhost:8765  (camera, pose, jog buttons, STOP)
+python teleop.py         # same thing in the terminal
+```
+Exit manual mode first, one person at the stop button. Keys: W/S x, A/D y, R/F z, Q/E wrist spin,
+O/C gripper step, G gentle hold, Tab 20/5 mm steps, M mark a moment, Space STOP.
+Every session writes `recordings/teleop-<time>.jsonl` (each command, the pose reached, error in mm, marks)
+and `recordings/teleop-<time>-trace.csv` (position, joints, gripper ~5x/s, also mid-move).
+Limits refuse moves into the table, walls, ceiling, or fingers into the vase. Nothing else is avoided.
+
 ## Files
 
 | File | What it does |
@@ -45,6 +57,8 @@ Teaching a pose: start `python recorder.py`, put the arm in manual mode (support
 | `composition.py` | Turns a planned arrangement into placements |
 | `ai.py` | Planner (feeling to arrangement) and blind critic (photo to feeling) |
 | `recorder.py` | Records hand-guided poses and photos |
+| `teleop.py` | Keyboard driving with limits, per-move log and continuous trace |
+| `dashboard.py` | Browser version of teleop with the wrist camera |
 | `PLAN.md` | Original plan; written for a pin frog, the vase replaced it |
 
 ## Safety
