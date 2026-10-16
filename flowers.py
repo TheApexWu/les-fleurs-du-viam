@@ -23,7 +23,8 @@ from viam.components.arm import Arm
 from viam.components.camera import Camera
 from viam.proto.common import (Geometry, GeometriesInFrame, Pose, PoseInFrame,
                                RectangularPrism, Vector3, WorldState)
-from viam.proto.service.motion import Constraints, LinearConstraint  # VERIFY import path
+from google.protobuf import json_format
+from viam.proto.service.motion import Constraints, LinearConstraint, MoveRequest
 from viam.robot.client import RobotClient
 from viam.services.motion import MotionClient
 
@@ -76,7 +77,7 @@ class FlowerBot:
         vc, vd = K.VASE_BOX["center"], K.VASE_BOX["dims"]
         geoms = [GeometriesInFrame(reference_frame="world", geometries=[Geometry(
             center=Pose(x=vc[0], y=vc[1], z=vc[2], o_z=1.0),
-            box=RectangularPrism(dims_mm=Vector3(x=vd[0], y=vd[1], z=vd[2])), label="vase")])]
+            box=RectangularPrism(dims_mm=Vector3(x=vd[0], y=vd[1], z=vd[2])), label="vase-measured")])]
         for i, ps in enumerate(self.in_vase):
             lo, hi = G.above_rim(ps, K.VASE["rim_z"])
             d = [hi[k] - lo[k] for k in range(3)]
@@ -97,12 +98,35 @@ class FlowerBot:
                 label=f"stem-{i}")]))
         return WorldState(obstacles=geoms)
 
+    async def plan(self, destination, world_state, constraints) -> dict:
+        """Ask the motion service for a plan without executing it (builtin DoCommand "plan",
+        rdk v1.12.0). Raises if no plan exists; flags a plan that only reaches part of the way."""
+        req = MoveRequest(name=K.MOTION, component_name=K.GRIPPER, destination=destination,
+                          world_state=world_state, constraints=constraints)
+        res = await self.motion.do_command({"plan": json_format.MessageToJson(req)})
+        if "plan_partialwp" in res:
+            raise RuntimeError(f"plan only reaches waypoint {res['plan_partialwp']}; not moving")
+        return res
+
     async def move(self, p, straight=False):
         constraints = (Constraints(linear_constraint=[LinearConstraint(line_tolerance_mm=2.0)])
                        if straight else None)
-        return await self.motion.move(component_name=K.GRIPPER,
-                                      destination=PoseInFrame(reference_frame="world", pose=pose(p)),
-                                      world_state=self.obstacles(), constraints=constraints)
+        destination = PoseInFrame(reference_frame="world", pose=pose(p))
+        world = self.obstacles()
+        if K.PLAN_CHECK:
+            await self.plan(destination, world, constraints)  # dry run first: a refusal raises, nothing moves
+        return await self.motion.move(component_name=K.GRIPPER, destination=destination,
+                                      world_state=world, constraints=constraints)
+
+    async def plan_check(self, *xyz):
+        """python flowers.py plan_check x y z: would the gripper (pointing down) get there? Never moves."""
+        x, y, z = (float(v) for v in xyz)
+        try:
+            res = await self.plan(PoseInFrame(reference_frame="world", pose=pose(G.P(x, y, z, theta=K.WRIST_DEG))),
+                                  self.obstacles(), None)
+            print(f"plan OK to ({x:.0f}, {y:.0f}, {z:.0f}): {len(res.get('plan') or [])} steps")
+        except Exception as e:  # noqa: BLE001 - report, never move
+            print(f"no plan to ({x:.0f}, {y:.0f}, {z:.0f}): {type(e).__name__}: {str(e)[:160]}")
 
     # ── steps ──────────────────────────────────────────────────────────────
     async def resources(self):
@@ -247,7 +271,7 @@ class FlowerBot:
 
 
 STEPS = {name: getattr(FlowerBot, name) for name in
-         ("resources", "teach", "grip_test", "grip_calibrate", "pick", "go_hub", "vase_one", "fill",
+         ("resources", "teach", "grip_test", "grip_calibrate", "pick", "go_hub", "vase_one", "fill", "plan_check",
           "insert_one", "sogetsu", "photo", "say")}
 
 
