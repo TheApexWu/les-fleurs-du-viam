@@ -20,7 +20,7 @@ Everything else waits until that works.
 
 6. **The gripper, not the flowers, limits how many fit.** With today's sizes, stems and blooms fit 5 with room, but the open gripper hits resting stems by the third drop. So: release ~10 cm above the rim, open the fingers only a little on release, and plan **3 stems** for the demo.
 
-7. **Gentle means a set width, not a force.** The gripper has no force setting; it holds at whatever width we command. `grip_calibrate` finds the stem's width and holds just inside it. Finger speed is turned down so it doesn't slap the stem.
+7. **Grip is a set width, not a force.** Rose stems are stiff enough for the default finger speed.
 
 8. **Leaves and thorns snag.** Strip everything from the stem below the bloom's lowest leaf cluster, at least the bottom 25 cm.
 
@@ -50,19 +50,15 @@ Everything else waits until that works.
 - [ ] C3. Release opens only ~60 past the stem width.
 - [ ] C4. Add the power strip as a box obstacle.
 
-### D. Bring-up on the arm (one person at the stop button, every time)
-- [ ] D1. `go_hub` with an empty gripper: is travel height reachable?
-- [ ] D2. `grip_calibrate` on a rose stem; copy the number into `config.GRIP_STEM`.
-- [ ] D3. Teach `slot0`: side grasp around a rose in the holder.
-- [ ] D4. Pick only: grab, lift clear, hold 5 s, put back. Repeat 3x.
-- [ ] D5. Drop only: hand the arm a rose, run the drop into the vase. Repeat 3x.
-- [ ] D6. `vase_one 0`: the whole thing. **3 in a row = today's goal done.**
+### D. Teleop, then replay (one person at the stop button, every time)
+- [ ] D1. Drive one pick-and-place on the dashboard, pressing M at approach, grasp, lift, over vase, release.
+- [ ] D2. `python replay.py recordings/teleop-<time>.jsonl`: one slow run.
+- [ ] D3. Replay 3 times in a row with the rose in the same spot. **That's today's goal.**
+- [ ] D4. A second rose: replay with a base offset, `python replay.py <log> 10`.
 
 ### E. If time is left
-- [ ] E1. `fill 3` with three different heights.
-- [ ] E2. Teach the `photo` pose (looking at the vase from the front), take a photo.
-- [ ] E3. Critic returns a guess on that photo.
-- [ ] E4. Commit, push, record a clean run on video as the safety net.
+- [ ] E1. Teach a `photo` pose looking at the vase from the front; `python flowers.py photo` runs the critic.
+- [ ] E2. Record a clean run on video as the safety net.
 
 ## Risks
 - Travel height out of reach with long stems → trim, grip lower (mental model 3).
