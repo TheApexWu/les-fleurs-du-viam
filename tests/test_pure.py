@@ -82,6 +82,48 @@ def test_long_stem_is_released_high_enough_to_clear_the_vase_floor():
     assert (high.o_x, high.o_y, high.o_z) == (low.o_x, low.o_y, low.o_z)
 
 
+
+def test_vase_limits_the_lean_deeper_is_steeper():
+    shallow = G.settled_tilt(depth_mm=200, rim_r=59, rim_frac=0.6)
+    deep = G.settled_tilt(depth_mm=400, rim_r=59, rim_frac=0.6)
+    assert 10 < deep < shallow < 35
+
+
+def test_settled_stem_leans_toward_its_side_and_rises_above_the_rim():
+    st = G.Stem("red", length_mm=450, bloom_mm=60)
+    ps = G.settle(st, (0, 0), rim_z=300, rim_r=59, depth_mm=250, lean_az_deg=0)
+    assert ps.foot[0] < 0 < ps.top[0]           # foot on the far side, top out over the lean side
+    assert ps.top[2] > 300
+    assert math.isclose(math.dist(ps.foot, ps.top), 450)
+
+
+def test_seg_dist_known_cases():
+    assert math.isclose(G.seg_dist((0, 0, 0), (10, 0, 0), (0, 5, 0), (10, 5, 0)), 5)       # parallel
+    assert math.isclose(G.seg_dist((0, 0, 0), (10, 0, 0), (5, -5, 3), (5, 5, 3)), 3)       # crossing
+    assert math.isclose(G.seg_dist((0, 0, 0), (1, 0, 0), (4, 0, 0), (9, 0, 0)), 3)         # collinear gap
+    assert math.isclose(G.seg_dist((0, 0, 0), (0, 0, 0), (3, 4, 0), (3, 4, 0)), 5)         # points
+
+
+def test_opposite_lean_has_more_clearance_than_the_same_lean():
+    st = G.Stem("red", 450, 60)
+    first = G.settle(st, (0, 0), 300, 59, 250, lean_az_deg=0)
+    same = G.settle(st, (0, 0), 300, 59, 250, lean_az_deg=0)
+    opposite = G.settle(st, (0, 0), 300, 59, 250, lean_az_deg=180)
+    grip_same, grip_opp = same.top, opposite.top
+    assert G.clearance(same, grip_same, [first], 300) < 0 < G.clearance(opposite, grip_opp, [first], 300)
+
+
+
+def test_big_blooms_on_close_leans_collide_even_when_stems_clear():
+    far = (0.0, 0.0, 5000.0)  # gripper out of the way, so only stems and blooms count
+    def gap(bloom):
+        st = G.Stem("y", 450, bloom)
+        a = G.settle(st, (0, 0), 300, 59, 250, lean_az_deg=0)
+        b = G.settle(st, (0, 0), 300, 59, 250, lean_az_deg=30)
+        return G.clearance(b, far, [a], 300)
+    assert gap(bloom=20) > 0 > gap(bloom=90)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

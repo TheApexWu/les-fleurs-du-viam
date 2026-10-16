@@ -14,6 +14,7 @@ Lines marked VERIFY use an SDK call not checked against the real machine yet.
 """
 import asyncio
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -48,6 +49,7 @@ class FlowerBot:
         self.arm = Arm.from_robot(robot, K.ARM)
         self.motion = MotionClient.from_robot(robot, K.MOTION)
         self.placed = []   # (Placement, stem height mm) of stems already in the kenzan
+        self.in_vase: list[G.PlacedStem] = []
 
     # ── primitives ─────────────────────────────────────────────────────────
     async def grip(self, width: int):
@@ -75,6 +77,17 @@ class FlowerBot:
         geoms = [GeometriesInFrame(reference_frame="world", geometries=[Geometry(
             center=Pose(x=vc[0], y=vc[1], z=vc[2], o_z=1.0),
             box=RectangularPrism(dims_mm=Vector3(x=vd[0], y=vd[1], z=vd[2])), label="vase")])]
+        for i, ps in enumerate(self.in_vase):
+            lo, hi = G.above_rim(ps, K.VASE["rim_z"])
+            d = [hi[k] - lo[k] for k in range(3)]
+            n = math.sqrt(sum(v * v for v in d)) or 1.0
+            mid = Pose(x=(lo[0] + hi[0]) / 2, y=(lo[1] + hi[1]) / 2, z=(lo[2] + hi[2]) / 2,
+                       o_x=d[0] / n, o_y=d[1] / n, o_z=d[2] / n)
+            w, b = ps.stem.stem_mm + 10, ps.stem.bloom_mm + 10
+            geoms.append(GeometriesInFrame(reference_frame="world", geometries=[
+                Geometry(center=mid, box=RectangularPrism(dims_mm=Vector3(x=w, y=w, z=n)), label=f"vase-stem-{i}"),
+                Geometry(center=Pose(x=hi[0], y=hi[1], z=hi[2], o_z=1.0),
+                         box=RectangularPrism(dims_mm=Vector3(x=b, y=b, z=b)), label=f"bloom-{i}")]))
         for i, (pl, h) in enumerate(self.placed):
             ken = K.taught()["kenzan"]
             center, dims = G.stem_obstacle((ken["x"], ken["y"], ken["z"]), pl.x, pl.y,
@@ -142,7 +155,7 @@ class FlowerBot:
     async def drop(self, lean_az=0.0, tilt=15.0):
         """Hub -> along the stem axis to just above the rim -> release -> back out -> hub."""
         pre, at = G.vase_drop_poses((K.VASE["x"], K.VASE["y"]), K.VASE["rim_z"], K.VASE["rim_r"],
-                                    lean_az, tilt, K.WRIST_DEG,
+                                    lean_az, tilt, K.WRIST_DEG, grip_above_rim_mm=K.RELEASE_ABOVE_RIM_MM,
                                     min_grip_z=(K.VASE_FLOOR_Z + K.VASE_STEM_BELOW_GRIP_MM + 20)
                                     if K.VASE_FLOOR_Z is not None else float("-inf"))
         await self.move(self.hub())
@@ -154,11 +167,38 @@ class FlowerBot:
         await self.speed(fast=True)
         await self.move(self.hub())
 
-    async def vase_one(self, slot=0, lean_az=0, tilt=15):
-        """Milestone 1 for the vase: one stem from the pitcher into the vase."""
+    def best_lean(self, stem: G.Stem) -> tuple[float, float]:
+        """Lean direction whose settled stem, bloom and release gripper stay furthest from what's
+        already in the vase. Returns (azimuth, clearance mm)."""
+        v = K.VASE
+        scored = []
+        for az in K.LEAN_CANDIDATES_DEG:
+            new = G.settle(stem, (v["x"], v["y"]), v["rim_z"], v["rim_r"], K.VASE_DEPTH_MM, az)
+            _, at = G.vase_drop_poses((v["x"], v["y"]), v["rim_z"], v["rim_r"], az, new.tilt_deg, K.WRIST_DEG,
+                                      grip_above_rim_mm=K.RELEASE_ABOVE_RIM_MM)
+            scored.append((G.clearance(new, (at.x, at.y, at.z), self.in_vase, v["rim_z"]), az))
+        gap, az = max(scored)
+        return az, gap
+
+    async def vase_one(self, slot=0, lean_az=None):
+        """One stem from slot into the vase. With no lean given, takes the roomiest direction."""
+        stem = G.Stem(**K.STEMS[int(slot)])
+        if lean_az is None:
+            lean_az, gap = self.best_lean(stem)
+            print(f"lean {lean_az:.0f} deg, clearance {gap:.0f} mm")
+            if gap < K.MIN_CLEARANCE_MM:
+                raise RuntimeError(f"no lean direction leaves {K.MIN_CLEARANCE_MM:.0f} mm; vase is full")
+        v = K.VASE
+        tilt = G.settled_tilt(K.VASE_DEPTH_MM, v["rim_r"], 0.6)
         await self.setup()
         await self.pick(slot)
-        await self.drop(float(lean_az), float(tilt))
+        await self.drop(float(lean_az), tilt)
+        self.in_vase.append(G.settle(stem, (v["x"], v["y"]), v["rim_z"], v["rim_r"], K.VASE_DEPTH_MM, float(lean_az)))
+
+    async def fill(self, n=3):
+        """n stems in a row, each in the roomiest direction, each an obstacle for the next."""
+        for slot in range(int(n)):
+            await self.vase_one(slot)
 
     async def go_hub(self):
         await self.setup()
@@ -207,7 +247,7 @@ class FlowerBot:
 
 
 STEPS = {name: getattr(FlowerBot, name) for name in
-         ("resources", "teach", "grip_test", "grip_calibrate", "pick", "go_hub", "vase_one",
+         ("resources", "teach", "grip_test", "grip_calibrate", "pick", "go_hub", "vase_one", "fill",
           "insert_one", "sogetsu", "photo", "say")}
 
 
