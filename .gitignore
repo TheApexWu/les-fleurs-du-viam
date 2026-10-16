@@ -6,3 +6,4 @@ photo*.jpg
 pose_trace.csv
 auto_poses.json
 recordings/
+logs/

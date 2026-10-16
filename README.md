@@ -4,7 +4,7 @@ A robot arm that arranges flowers to express a feeling. You type "gratitude" or 
 
 Viam hackathon, 16-17 Oct 2026, robot `armfarm12` (xArm, wrist camera, gripper).
 
-**Today's plan, mental model and task list: [TODAY.md](TODAY.md). Diagrams of how it all fits: [ARCHITECTURE.md](ARCHITECTURE.md).**
+**Today's plan, mental model and task list: [TODAY.md](TODAY.md). Diagrams of how it all fits: [ARCHITECTURE.md](ARCHITECTURE.md).** For the saved-pose flowerless loop and one-stem gripper run, see [GRIPPER_MANUAL.md](GRIPPER_MANUAL.md).
 
 ## Where we are (Fri 16 Oct, ~4 pm)
 
@@ -12,6 +12,8 @@ Viam hackathon, 16-17 Oct 2026, robot `armfarm12` (xArm, wrist camera, gripper).
 - Teleop works: dashboard with hold-to-move, base swing, limits, and a log of every move (median error 0.13 mm over 103 moves).
 - Every planned move is dry-run first (`plan_check`). Over the vase the gripper reaches z 600 at most, so roses need a side grasp.
 - `replay.py` plays back the moments marked with M in a teleop session. **Not run on the arm yet.**
+- The semantic gripper calibration succeeded on one stem: reported aperture 45 and holding sensor true. Confirm a stem visually; the sensor is advisory.
+- The five saved waypoints in `taught_poses.json` support `pretend_loop` and the supervised one-stem `pick_and_drop`; see [GRIPPER_MANUAL.md](GRIPPER_MANUAL.md). The full physical flower transfer still needs a supervised run.
 
 Next:
 1. Reconcile the vase position: our measurement (300, -283, rim z 420) vs the team's config (360, 234, top ~242).
@@ -29,6 +31,8 @@ python3 -m pytest -q tests       # offline, no robot (teleop limits)
 ```
 
 Teaching a pose: start `python recorder.py`, put the arm in manual mode (support it from below before pressing the button), move it, hold still for a second at each spot. Then `python recorder.py promote p12 slot0 --down -15`.
+
+For the captured flowerless path, run `python flowers.py pretend_loop`; for a supervised one-stem transfer, run `python flowers.py pick_and_drop`. Follow the safety checklist in [GRIPPER_MANUAL.md](GRIPPER_MANUAL.md).
 
 ## Driving the arm by hand (teleop)
 
