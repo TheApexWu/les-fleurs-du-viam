@@ -3,6 +3,7 @@
   python teleop.py            terminal version; dashboard.py is the browser version of the same thing
 
   W/S  x +/-        A/D  y +/-        R/F  z +/-        Q/E  wrist spin -/+ 5 deg
+  J/L  swing the whole arm about its base: J toward +y, L toward -y (10 deg, 2 deg in fine mode)
   O/C  gripper open/close a step      G  gripper to GRIP_STEM (gentle hold)
   Tab  step 20 mm <-> 5 mm            M  mark this moment with a label
   Space  stop                         X  quit
@@ -23,6 +24,7 @@ from pathlib import Path
 import config as K
 
 STEPS_MM = (20.0, 5.0)
+BASE_STEPS_DEG = (10.0, 2.0)
 SPIN_DEG = 5.0
 GRIP_STEP = 50
 ACCURACY_MM = 2.0
@@ -51,6 +53,22 @@ def clamp_ok(x: float, y: float, z: float) -> tuple[bool, str]:
         return False, f"y {y:.0f} past side wall limit {Y_MIN:.0f}"
     if math.hypot(x - K.VASE["x"], y - K.VASE["y"]) < VASE_KEEPOUT_R and z < VASE_MIN_Z:
         return False, f"over the vase at z {z:.0f}; fingers must stay above {VASE_MIN_Z:.0f}"
+    return True, ""
+
+
+def swing(x: float, y: float, d_deg: float) -> tuple[float, float]:
+    """Where the fingertip lands when joint 1 turns by d_deg: the base axis is the world z axis."""
+    a = math.radians(d_deg)
+    return x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a)
+
+
+def arc_ok(x: float, y: float, z: float, d_deg: float) -> tuple[bool, str]:
+    """Check every degree of a base swing, not just its end: the arc can cross the vase."""
+    n = max(1, int(abs(d_deg)))
+    for i in range(1, n + 1):
+        ok, why = clamp_ok(*swing(x, y, d_deg * i / n), z)
+        if not ok:
+            return False, f"swing {d_deg * i / n:+.0f} deg: {why}"
     return True, ""
 
 
@@ -144,6 +162,24 @@ class Jogger:
                 self.write({"cmd": {"key": key, "delta": d}, "refused": why, "pose": pose})
                 return f"refused: {why}"
             cmd = {"key": key, "delta": d}
+        elif key in ("j", "l"):
+            from viam.proto.component.arm import JointPositions
+            d = BASE_STEPS_DEG[self.step_i] * (1 if key == "j" else -1)
+            ok, why = arc_ok(pose["x"], pose["y"], pose["z"], d)
+            if not ok:
+                self.write({"cmd": {"key": key, "d_base_deg": d}, "refused": why, "pose": pose})
+                return f"refused: {why}"
+            tx, ty = swing(pose["x"], pose["y"], d)
+            target = dict(pose, x=tx, y=ty)
+            await self.arm.move_to_joint_positions(JointPositions(values=[joints[0] + d] + joints[1:]))
+            reached, joints, g = await self.snapshot()
+            err = math.dist((tx, ty, pose["z"]), (reached["x"], reached["y"], reached["z"]))
+            self.write({"cmd": {"key": key, "d_base_deg": d}, "target": target, "pose": reached,
+                        "joints": joints, "gripper": g, "err_mm": round(err, 2)})
+            self.last = {"pose": reached, "gripper": g, "err_mm": round(err, 2)}
+            flag = "  <-- off predicted arc" if err > ACCURACY_MM else ""
+            return (f"{key}: base {d:+.0f} deg -> x={reached['x']:.0f} y={reached['y']:.0f} z={reached['z']:.0f}"
+                    f"  err {err:.1f} mm{flag}")
         elif key in ("q", "e"):
             target = dict(pose, theta=pose["theta"] + (SPIN_DEG if key == "e" else -SPIN_DEG))
             cmd = {"key": key, "d_theta": target["theta"] - pose["theta"]}

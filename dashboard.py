@@ -94,6 +94,7 @@ button:hover{border-color:var(--acc)} button.on{border-color:var(--acc);color:va
    <button onclick="k('a')">A y+</button><button onclick="k('s')">S x-</button><button onclick="k('d')">D y-</button>
    <button onclick="k('r')">R z+</button><button onclick="k('\\t')">Tab step</button><button onclick="k('f')">F z-</button>
    <button onclick="k('o')">O open</button><button onclick="k('g')">G gentle</button><button onclick="k('c')">C close</button>
+   <button onclick="k('j')">J base +y</button><span></span><button onclick="k('l')">L base -y</button>
   </div>
   <button onclick="mark()" style="width:100%">M mark this moment</button>
   <p class="mut">Keyboard works when this page has focus. Keys are ignored while a move runs.
@@ -111,7 +112,7 @@ document.addEventListener('keydown',e=>{
  if(e.repeat)return; const key=e.key===' '?' ':e.key==='Tab'?'\\t':e.key.toLowerCase();
  if(key===' '){e.preventDefault();return stop()}
  if(key==='m'){e.preventDefault();return mark()}
- if('wasdrfqeocg\\t'.includes(key)){e.preventDefault();k(key)}
+ if('wasdrfqeocgjl\\t'.includes(key)){e.preventDefault();k(key)}
 });
 async function poll(){
  try{const s=await (await fetch('/state')).json(),p=s.pose;
