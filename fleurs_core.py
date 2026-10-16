@@ -14,7 +14,7 @@ BASE_STEPS_DEG = (10.0, 2.0)
 SPIN_DEG = 5.0
 GRIP_STEP = 50
 ACCURACY_MM = 2.0
-TELEOP_DEG_S = 15.0
+TELEOP_DEG_S = 25.0  # raised from 15 on 16 Oct with hold-to-move; fine mode (Tab) for precision
 TRACE_HZ = 5.0
 FIELDS = ("x", "y", "z", "o_x", "o_y", "o_z", "theta")
 

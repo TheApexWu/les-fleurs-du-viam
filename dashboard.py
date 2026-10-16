@@ -6,7 +6,7 @@ Same Jogger as teleop.py, so the limits, the log and the one-move-at-a-time rule
 Listens on localhost only: the page can move a real arm, so it is not exposed to the network.
 """
 import asyncio
-import json
+import time
 
 from aiohttp import web
 
@@ -14,6 +14,8 @@ import config as K
 from teleop import STEPS_MM, Jogger
 
 PORT = 8765
+HOLDABLE = set("wasdrfqejloc")
+HEARTBEAT_TIMEOUT_S = 0.6  # no heartbeat from the page for this long while holding: stop the arm
 
 
 async def build_app():
@@ -40,7 +42,8 @@ async def build_app():
         pose, joints, g = jog.latest["pose"], jog.latest["joints"], jog.latest["gripper"]
         return web.json_response({"pose": pose, "joints": joints, "gripper": g, "busy": jog.busy.locked(),
                                   "step_mm": STEPS_MM[jog.step_i], "last": jog.last, "lines": lines[-12:],
-                                  "log": f"{jog.log_path.name} + {jog.trace_path.name}"})
+                                  "log": f"{jog.log_path.name} + {jog.trace_path.name}",
+                                  "holding": hold["key"]})
 
     async def key(req):
         body = await req.json()
@@ -49,9 +52,57 @@ async def build_app():
         return web.json_response({"msg": msg})
 
     async def stop(_):
+        hold["key"] = None
         msg = await jog.stop()
         lines.append(msg)
         return web.json_response({"msg": msg})
+
+    # Hold-to-move: the page sends start, then a heartbeat every 200 ms, then stop on release.
+    hold = {"key": None, "beat": 0.0, "steps": 0, "task": None}
+
+    async def hold_loop(key):
+        hold["steps"] = 0
+        try:
+            while hold["key"] == key:
+                msg = await jog.handle(key)
+                hold["steps"] += 1
+                lines.append(msg)
+                if msg.startswith(("refused", "error", "busy", "unknown")):
+                    break
+        finally:
+            if hold["key"] == key:
+                hold["key"] = None
+
+    async def watchdog(key):
+        while hold["key"] == key:
+            if time.time() - hold["beat"] > HEARTBEAT_TIMEOUT_S:
+                hold["key"] = None
+                await jog.arm.stop()
+                jog.write({"cmd": "hold_watchdog_stop", "key": key})
+                lines.append("STOP: lost contact with the page while holding")
+                return
+            await asyncio.sleep(0.1)
+
+    async def hold_route(req):
+        body = await req.json()
+        action, key = body.get("action"), str(body.get("key", "")).lower()
+        if action == "start":
+            if key not in HOLDABLE or hold["key"] is not None:
+                return web.json_response({"msg": "ignored"})
+            hold.update(key=key, beat=time.time())
+            jog.write({"cmd": "hold_start", "key": key})
+            hold["task"] = asyncio.create_task(hold_loop(key))
+            asyncio.create_task(watchdog(key))
+        elif action == "beat":
+            if hold["key"] == key:
+                hold["beat"] = time.time()
+        elif action == "stop":
+            if hold["key"] == key:
+                hold["key"] = None
+                if hold["steps"] >= 1:  # a quick tap keeps its single step; a real hold stops at once
+                    await jog.arm.stop()
+                jog.write({"cmd": "hold_release", "key": key, "steps": hold["steps"]})
+        return web.json_response({"msg": "ok", "holding": hold["key"]})
 
     async def cleanup(_):
         await jog.arm.stop()
@@ -60,7 +111,7 @@ async def build_app():
 
     app = web.Application()
     app.add_routes([web.get("/", index), web.get("/frame.jpg", frame), web.get("/state", state),
-                    web.post("/key", key), web.post("/stop", stop)])
+                    web.post("/key", key), web.post("/stop", stop), web.post("/hold", hold_route)])
     app.on_cleanup.append(cleanup)
     return app
 
@@ -90,14 +141,15 @@ button:hover{border-color:var(--acc)} button.on{border-color:var(--acc);color:va
  <div class="card"><h1>State <span id="busy"></span></h1><table id="st"></table></div>
  <div class="card" style="margin-top:12px"><h1>Jog <span class="mut" id="step"></span></h1>
   <div class="grid">
-   <button onclick="k('q')">Q spin-</button><button onclick="k('w')">W x+</button><button onclick="k('e')">E spin+</button>
-   <button onclick="k('a')">A y+</button><button onclick="k('s')">S x-</button><button onclick="k('d')">D y-</button>
-   <button onclick="k('r')">R z+</button><button onclick="k('\\t')">Tab step</button><button onclick="k('f')">F z-</button>
-   <button onclick="k('o')">O open</button><button onclick="k('g')">G gentle</button><button onclick="k('c')">C close</button>
-   <button onclick="k('j')">J base +y</button><span></span><button onclick="k('l')">L base -y</button>
+   <button onmousedown="hs('q')" onmouseup="he('q')" onmouseleave="he('q')" ontouchstart="hs('q')" ontouchend="he('q')">Q spin-</button><button onmousedown="hs('w')" onmouseup="he('w')" onmouseleave="he('w')" ontouchstart="hs('w')" ontouchend="he('w')">W x+</button><button onmousedown="hs('e')" onmouseup="he('e')" onmouseleave="he('e')" ontouchstart="hs('e')" ontouchend="he('e')">E spin+</button>
+   <button onmousedown="hs('a')" onmouseup="he('a')" onmouseleave="he('a')" ontouchstart="hs('a')" ontouchend="he('a')">A y+</button><button onmousedown="hs('s')" onmouseup="he('s')" onmouseleave="he('s')" ontouchstart="hs('s')" ontouchend="he('s')">S x-</button><button onmousedown="hs('d')" onmouseup="he('d')" onmouseleave="he('d')" ontouchstart="hs('d')" ontouchend="he('d')">D y-</button>
+   <button onmousedown="hs('r')" onmouseup="he('r')" onmouseleave="he('r')" ontouchstart="hs('r')" ontouchend="he('r')">R z+</button><button onclick="k('\\t')">Tab step</button><button onmousedown="hs('f')" onmouseup="he('f')" onmouseleave="he('f')" ontouchstart="hs('f')" ontouchend="he('f')">F z-</button>
+   <button onmousedown="hs('o')" onmouseup="he('o')" onmouseleave="he('o')" ontouchstart="hs('o')" ontouchend="he('o')">O open</button><button onclick="k('g')">G gentle</button><button onmousedown="hs('c')" onmouseup="he('c')" onmouseleave="he('c')" ontouchstart="hs('c')" ontouchend="he('c')">C close</button>
+   <button onmousedown="hs('j')" onmouseup="he('j')" onmouseleave="he('j')" ontouchstart="hs('j')" ontouchend="he('j')">J base +y</button><span></span><button onmousedown="hs('l')" onmouseup="he('l')" onmouseleave="he('l')" ontouchstart="hs('l')" ontouchend="he('l')">L base -y</button>
   </div>
   <button onclick="mark()" style="width:100%">M mark this moment</button>
-  <p class="mut">Keyboard works when this page has focus. Keys are ignored while a move runs.
+  <p class="mut">Hold a key or button to keep moving; release to stop at once. A tap is one step.
+  Leaving the tab while holding stops the arm.
   View rotation: <button id="rot" onclick="rot()">0&deg;</button></p></div>
  <div class="card" style="margin-top:12px"><h1>Log <span class="mut" id="logname"></span></h1><div id="lines"></div></div>
 </div></div>
@@ -107,13 +159,21 @@ const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/js
 function stop(){post('/stop')}
 function k(key,label){return post('/key',{key,label})}
 function mark(){const l=prompt('label for this moment');if(l)k('m',l)}
+let held=null,beat=null;
+function hs(key){if(held)return;held=key;post('/hold',{action:'start',key});beat=setInterval(()=>post('/hold',{action:'beat',key}),200)}
+function he(key){if(held!==key)return;clearInterval(beat);held=null;post('/hold',{action:'stop',key})}
+window.addEventListener('blur',()=>held&&he(held));
+document.addEventListener('visibilitychange',()=>document.hidden&&held&&he(held));
 function rot(){angle=(angle+90)%360;document.getElementById('cam').style.transform=`rotate(${angle}deg)`;document.getElementById('rot').innerHTML=angle+'&deg;'}
 document.addEventListener('keydown',e=>{
- if(e.repeat)return; const key=e.key===' '?' ':e.key==='Tab'?'\\t':e.key.toLowerCase();
- if(key===' '){e.preventDefault();return stop()}
+ if(e.repeat){if('wasdrfqejloc'.includes(e.key.toLowerCase()))e.preventDefault();return}
+ const key=e.key===' '?' ':e.key==='Tab'?'\\t':e.key.toLowerCase();
+ if(key===' '){e.preventDefault();if(held)he(held);return stop()}
  if(key==='m'){e.preventDefault();return mark()}
- if('wasdrfqeocgjl\\t'.includes(key)){e.preventDefault();k(key)}
+ if('wasdrfqejloc'.includes(key)){e.preventDefault();return hs(key)}
+ if('g\\t'.includes(key)){e.preventDefault();k(key)}
 });
+document.addEventListener('keyup',e=>{const key=e.key.toLowerCase();if(key===held)he(key)});
 async function poll(){
  try{const s=await (await fetch('/state')).json(),p=s.pose;
   document.getElementById('st').innerHTML=
