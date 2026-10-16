@@ -11,9 +11,6 @@ MOTION = "builtin"
 PLAN_CHECK = True  # dry-run every planned move and refuse it if there is no full plan
 PLAN_TIMEOUT_S = 30.0
 
-GRIP_STEM = 120     # move_gripper width for holding a stem (0 closed, 850 open)
-GRIP_SPEED = 1500   # module default; rose stems are stiff enough
-
 # Plan-checked 16 Oct over the vase, gripper down: wrist -15 makes the wrist hit the camera, -105 plans;
 # z 600 is the highest reachable point there.
 WRIST_DEG = -105.0

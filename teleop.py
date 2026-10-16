@@ -4,7 +4,7 @@
 
   W/S  x +/-        A/D  y +/-        R/F  z +/-        Q/E  wrist spin -/+ 5 deg
   J/L  swing the whole arm about its base: J toward +y, L toward -y (10 deg, 2 deg in fine mode)
-  O/C  gripper open/close a step      G  gripper to GRIP_STEM (gentle hold)
+  O/C  gripper open/close a step      G  grab (the gripper's default close)
   Tab  step 20 mm <-> 5 mm            M  mark this moment with a label
   Space  stop                         X  quit
 
@@ -20,7 +20,7 @@ import config as K
 
 import fleurs_core as core
 
-core.configure(vase=K.VASE, table_top_z=K.TABLE_TOP_Z, grip_speed=K.GRIP_SPEED, grip_stem=K.GRIP_STEM)
+core.configure(vase=K.VASE, table_top_z=K.TABLE_TOP_Z)
 from fleurs_core import *  # noqa: E402,F401,F403 - re-exported for tests and the dashboard
 from fleurs_core import Jogger  # noqa: E402
 
@@ -40,10 +40,11 @@ def read_key() -> str:
 async def main():
     import termios
     from viam.components.arm import Arm
+    from viam.components.gripper import Gripper
     from flowers import connect
 
     robot = await connect()
-    jog = Jogger(Arm.from_robot(robot, K.ARM))
+    jog = Jogger(Arm.from_robot(robot, K.ARM), Gripper.from_robot(robot, K.GRIPPER))
     try:
         await jog.start()
         print(__doc__.split("\n\n")[1])
