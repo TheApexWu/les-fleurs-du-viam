@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import composition as C  # noqa: E402
 import geometry as G  # noqa: E402
+import teleop as T  # noqa: E402
 
 
 def test_sogetsu_tilts_are_clamped_but_intent_is_kept():
@@ -122,6 +123,16 @@ def test_big_blooms_on_close_leans_collide_even_when_stems_clear():
         b = G.settle(st, (0, 0), 300, 59, 250, lean_az_deg=30)
         return G.clearance(b, far, [a], 300)
     assert gap(bloom=20) > 0 > gap(bloom=90)
+
+
+
+def test_teleop_limits():
+    v = T.K.VASE
+    assert not T.clamp_ok(300, 0, T.FLOOR_Z - 10)[0]                      # into the table
+    assert not T.clamp_ok(v["x"], v["y"], v["rim_z"] - 20)[0]              # fingers into the vase
+    assert T.clamp_ok(v["x"] + 200, v["y"] + 200, v["rim_z"] - 20)[0]     # same height, clear of the vase
+    assert not T.clamp_ok(T.X_MAX + 1, 0, 300)[0] and not T.clamp_ok(300, T.Y_MIN - 1, 300)[0]
+    assert T.clamp_ok(300, 0, 300) == (True, "")
 
 
 if __name__ == "__main__":
