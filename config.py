@@ -11,23 +11,27 @@ ARM = os.environ.get("FLOWERS_ARM", "arm-1")
 GRIPPER = os.environ.get("FLOWERS_GRIPPER", "gripper-1")
 CAMERA = os.environ.get("FLOWERS_CAMERA", "cam")
 MOTION = "builtin"
+PLAN_CHECK = True  # every planned move is dry-run first and refused if no full plan exists
 
 # Gripper widths for the xArm module's DoCommand move_gripper (0 = closed, 850 = open).
 # Tune on the day so a stem is held firmly without crushing: measure, don't guess.
 GRIP_OPEN = 600
 GRIP_STEM = 120          # replace with grip_calibrate's suggestion for the real stems
 GRIP_RELEASE_MARGIN = 150  # open only this far past the stem on release, so it doesn't swing
-GRIP_SPEED = 400         # of 5000; the module default is 1500, which slaps the stem
+GRIP_SPEED = 1500        # of 5000, the module default; rose stems are stiff enough (16 Oct)
 GRIP_EMPTY_MAX = 15      # a closed reading below this means the fingers met nothing
 
 # Arm speed per move: quick in open air, slow within ~10 cm of the stem, pitcher or vase.
 FAST_DEG_S, SLOW_DEG_S, ACCEL_DEG_S2 = 40.0, 12.0, 150.0
-WRIST_DEG = -15.0        # shared wrist spin for every pick and drop, so moves never twist
+WRIST_DEG = -105.0       # plan-checked 16 Oct: at -15 the wrist hits the camera over the vase; -105 plans
 VASE_STEM_BELOW_GRIP_MM = 350.0  # held chopstick below the fingers; measure on the real stems
 VASE_DEPTH_MM = 250.0    # inside depth rim to floor: GUESS until measured with a ruler or a table touch
 VASE_FLOOR_Z = None      # set after one fingertip touch on the table; until then only the rim is used
 # Crossing height: the held stem's tip must clear the vase rim, not just the gripper.
-TRAVEL_Z = 420.0 + VASE_STEM_BELOW_GRIP_MM + 40.0
+# Plan-checked 16 Oct over the vase centre, gripper down, wrist -105: z 500 and 600 plan, 680 is
+# unreachable. So at most ~140 mm of stem may hang below the fingers when crossing the rim.
+TRAVEL_Z_MAX = 600.0
+TRAVEL_Z = min(420.0 + VASE_STEM_BELOW_GRIP_MM + 40.0, TRAVEL_Z_MAX)
 
 # Stem handling, mm. stem_below_grip = how far the stem tip hangs below the gripper's TCP.
 STEM_BELOW_GRIP_MM = 90.0

@@ -28,6 +28,8 @@ Everything else waits until that works.
 
 10. **Teaching poses:** run `recorder.py`, hand-guide in manual mode (support the arm from below before pressing the button), hold still for 1 s at each spot, then `promote`. Side-grasp poses keep their hand-taught angle (no `--down`).
 
+11. **Plan before moving, and what it found (16 Oct, 2:45 pm).** Every planned move is now dry-run first. Live checks over the vase: the gripper pointing down reaches z 600 at most, and only with the wrist at -105°. So at most ~14 cm of stem can hang below the fingers when crossing the rim. Roses gripped below the bloom need the side grasp.
+
 ## Tasks, in order
 
 ### A. Physical prep (anyone, no robot needed)

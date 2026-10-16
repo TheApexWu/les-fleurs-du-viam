@@ -135,6 +135,22 @@ def test_teleop_limits():
     assert T.clamp_ok(300, 0, 300) == (True, "")
 
 
+
+def test_base_swing_keeps_radius_and_checks_the_whole_arc():
+    x, y = T.swing(200, 0, 90)
+    assert math.isclose(x, 0, abs_tol=1e-9) and math.isclose(y, 200)
+    v = T.K.VASE
+    r = math.hypot(v["x"], v["y"])
+    start = (r, 0.0)                      # same radius as the vase, on the +x axis
+    vase_az = math.degrees(math.atan2(v["y"], v["x"]))
+    low = v["rim_z"] - 50
+    # ending well past the vase is fine at the end point, but the arc crosses it low down
+    end_x, end_y = T.swing(*start, vase_az - 30)
+    assert T.clamp_ok(end_x, end_y, low)[0]
+    assert not T.arc_ok(*start, low, vase_az - 30)[0]
+    assert T.arc_ok(*start, v["rim_z"] + 50, vase_az - 30)[0]   # same swing above the rim is fine
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
