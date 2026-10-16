@@ -12,7 +12,7 @@ Done:
 - Connected to armfarm12; resources are `arm`, `cam`, `gripper`, plus obstacle boxes `table`, `wall-front`, `wall-side`, `ceiling`.
 - Vase measured with the arm (4 rim touches, circle fit within 5 mm): centre (300, -283), rim z 420, radius 59 mm. It sits on a black tape square; if it moves, re-measure.
 - `recorder.py` logs hand-guided moves in manual mode and snapshots each resting pose with a photo.
-- Code for gentle gripping, a grasp check, slow final approaches and the vase drop (`vase_one`). 11 offline tests pass. **None of the new moves have run on the arm yet.**
+- Code for gentle gripping, a grasp check, slow final approaches and the vase drop (`vase_one`). 16 offline tests pass. **None of the new moves have run on the arm yet.**
 
 Next, in order:
 1. Touch the table next to the tape once (gives the vase floor height).
