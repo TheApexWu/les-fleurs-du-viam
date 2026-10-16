@@ -17,7 +17,7 @@ MOTION = "builtin"
 GRIP_OPEN = 600
 GRIP_STEM = 120          # replace with grip_calibrate's suggestion for the real stems
 GRIP_RELEASE_MARGIN = 150  # open only this far past the stem on release, so it doesn't swing
-GRIP_SPEED = 400         # of 5000; the module default is 1500, which slaps the stem
+GRIP_SPEED = 1500        # of 5000, the module default; rose stems are stiff enough (16 Oct)
 GRIP_EMPTY_MAX = 15      # a closed reading below this means the fingers met nothing
 
 # Arm speed per move: quick in open air, slow within ~10 cm of the stem, pitcher or vase.

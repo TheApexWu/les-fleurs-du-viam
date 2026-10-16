@@ -22,7 +22,7 @@ FIELDS = ("x", "y", "z", "o_x", "o_y", "o_z", "theta")
 # reads no config and runs unchanged on the laptop or inside the Viam module on the robot.
 VASE = {"x": 300.0, "y": -283.0, "rim_z": 420.0, "rim_r": 59.0}
 TABLE_TOP_Z = -23.0
-GRIP_SPEED, GRIP_STEM = 400, 120
+GRIP_SPEED, GRIP_STEM = 1500, 120
 LOG_DIR = Path(__file__).parent / "recordings"
 X_MAX, Y_MIN, Z_MAX = 650.0, -420.0, 900.0
 FLOOR_Z = VASE_KEEPOUT_R = VASE_MIN_Z = 0.0
