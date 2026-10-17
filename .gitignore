@@ -7,3 +7,6 @@ pose_trace.csv
 auto_poses.json
 recordings/
 logs/
+vision/data/synth/
+vision/runs/
+*.pt.tmp
