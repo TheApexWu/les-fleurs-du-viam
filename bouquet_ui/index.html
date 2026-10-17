@@ -7,6 +7,7 @@
   <meta name="description" content="Choose roses, carnations and lilies, check the workbench, and let the flower robot arrange your bouquet one stem at a time.">
   <title>Les Fleurs du Viam — Bouquet Studio</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/taste.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
@@ -97,8 +98,22 @@
         </aside>
       </div>
 
+      <section class="taste-panel" id="taste-panel" aria-labelledby="taste-title" hidden>
+        <div class="section-heading"><div><p class="eyebrow">03 / THE EYE</p><h2 id="taste-title">A second opinion.</h2></div><span class="soft-tag">TASTE LENS</span></div>
+        <div class="taste-grid">
+          <div class="taste-sketch" id="taste-sketch"></div>
+          <div class="taste-read">
+            <div class="taste-overall"><span id="taste-score">0</span><small>/ 100</small><p id="taste-mood"></p></div>
+            <div class="taste-axes" id="taste-axes"></div>
+            <p class="taste-critique" id="taste-critique"></p>
+            <button class="button button-secondary taste-apply" id="taste-apply" type="button" hidden></button>
+            <p class="taste-note">Scored with floristry rules: colour harmony, odd-number rhythm, tall-middle-low proportion and a lead colour. Not a trained model. The arm's camera checks what is actually on the table.</p>
+          </div>
+        </div>
+      </section>
+
       <section class="progress-panel" id="progress-panel" aria-labelledby="progress-title" hidden>
-        <div class="progress-heading"><div><p class="eyebrow">03 / COMING TOGETHER</p><h2 id="progress-title">One stem at a time.</h2></div><span id="progress-count">0 / 0 stems</span></div>
+        <div class="progress-heading"><div><p class="eyebrow">04 / COMING TOGETHER</p><h2 id="progress-title">One stem at a time.</h2></div><span id="progress-count">0 / 0 stems</span></div>
         <div class="progress-track" role="progressbar" id="progress-track" aria-label="Bouquet completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-fill"></span></div>
         <p id="progress-message" role="status">Preparing your bouquet.</p>
         <p class="progress-verification" id="progress-verification" hidden></p>
