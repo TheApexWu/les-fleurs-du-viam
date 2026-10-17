@@ -10,4 +10,3 @@ logs/
 vision/data/synth/
 vision/runs/
 *.pt.tmp
-__pycache__/

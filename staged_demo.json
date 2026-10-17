@@ -1,0 +1,71 @@
+{
+  "camera": "cam",
+  "vision_service": "vision-1",
+  "image_size": [
+    1280,
+    720
+  ],
+  "scan_pose": {
+    "x": 288.5501013001384,
+    "y": 233.5668795209395,
+    "z": 558.6634413877227,
+    "o_x": 0.06464743135086021,
+    "o_y": -0.08664942867689115,
+    "o_z": -0.9941391180965085,
+    "theta": 124.78462380152521
+  },
+  "scan_camera_pose": {
+    "x": 365.27823372149476,
+    "y": 258.0773954358777,
+    "z": 649.0295207799059,
+    "o_x": 0.03419471103250546,
+    "o_y": -0.08419748509699546,
+    "o_z": -0.9958621918924042,
+    "theta": -160.85764168252123
+  },
+  "image_workspace_polygon": [
+    [
+      246,
+      26
+    ],
+    [
+      987,
+      44
+    ],
+    [
+      999,
+      660
+    ],
+    [
+      224,
+      663
+    ]
+  ],
+  "version": 1,
+  "mode": "staged",
+  "workspace_bounds": null,
+  "verified_digest": null,
+  "slots": [
+    {
+      "id": "orange-lily",
+      "variety": "lily",
+      "color": "orange",
+      "pickup_poses": {},
+      "marker": null
+    },
+    {
+      "id": "yellow-lily",
+      "variety": "lily",
+      "color": "yellow",
+      "pickup_poses": {},
+      "marker": null
+    },
+    {
+      "id": "red-rose",
+      "variety": "rose",
+      "color": "red",
+      "pickup_poses": {},
+      "marker": null
+    }
+  ]
+}

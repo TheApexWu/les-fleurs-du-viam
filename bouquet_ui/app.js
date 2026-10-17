@@ -3,6 +3,7 @@
   'use strict';
 
   const demo = new URLSearchParams(window.location.search).get('demo') === '1';
+  const teaching = new URLSearchParams(window.location.search).get('teach') === '1';
   const MAX_ORDER_SIZE = 12;
   const $ = (id) => document.getElementById(id);
   // Colours sampled from the stems on the workbench; one entry per variety and colour we stock.
@@ -16,7 +17,7 @@
     'lily:yellow': { label: 'Yellow lily', swatch: '#e2d45a', background: '#f3f2df', light: '#c2b544' },
   };
   const VARIETIES = [['rose', 'Roses'], ['carnation', 'Carnations'], ['lily', 'Lilies']];
-  const keyOf = (item) => `${item.variety || 'rose'}:${item.color}`;
+  const keyOf = (item) => item.key || `${item.variety || 'rose'}:${item.color}`;
   const stock = () => Object.entries(palette).map(([key, theme]) => {
     const [variety, color] = key.split(':');
     return { variety, color, label: theme.label, available: null };
@@ -103,7 +104,7 @@
 
   async function api(path, options = {}) {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 30000);
+    const timeout = window.setTimeout(() => controller.abort(), 90000);
     try {
       const response = await fetch(path, {
         ...options,
@@ -146,7 +147,9 @@
       picture.append(textElement('span', '✓', 'card-picked'));
       const body = textElement('div', '', 'flower-card-body');
       body.append(textElement('h3', label));
-      body.append(textElement('p', Number.isInteger(item.available) ? `${item.available} available in view` : 'Inventory not scanned', 'available-label'));
+      body.append(textElement('p', Number.isInteger(item.detected_count)
+        ? `${item.detected_count} ${state.inventory?.staged_demo ? 'at marked slot' : 'detected'} · ${item.available || 0} ready to pick`
+        : Number.isInteger(item.available) ? `${item.available} available in view` : 'Inventory not scanned', 'available-label'));
       const controls = textElement('div', '', 'quantity-control');
       for (const [delta, symbol, action] of [[-1, '−', 'Remove'], [1, '+', 'Add']]) {
         if (delta === 1) {
@@ -156,9 +159,9 @@
         }
         const button = textElement('button', symbol);
         button.type = 'button';
-        button.setAttribute('aria-label', `${action} one ${label.toLowerCase()}`);
+        button.setAttribute('aria-label', `${action} one ${label.toLowerCase().replace(/roses$/, 'rose').replace(/carnations$/, 'carnation').replace(/lilies$/, 'lily')}`);
         button.dataset.control = `${keyOf(item)}:${delta}`;
-        button.disabled = !!activeOrder() || state.busy || (delta < 0 ? quantity === 0 : total() >= MAX_ORDER_SIZE);
+        button.disabled = !!activeOrder() || state.busy || (delta < 0 ? quantity === 0 : total() >= (state.inventory?.commissioning ? 1 : MAX_ORDER_SIZE));
         button.addEventListener('click', () => {
           state.quantities[keyOf(item)] = Math.max(0, quantity + delta);
           invalidatePlan();
@@ -214,21 +217,24 @@
       const dot = textElement('span', '', 'color-dot');
       dot.style.setProperty('--swatch', styleFor(item).swatch);
       row.append(dot, textElement('span', item.label || styleFor(item).label));
-      row.append(textElement('span', Number.isInteger(item.available) ? `${item.available} stem${item.available === 1 ? '' : 's'}` : '—', 'inventory-count'));
+      row.append(textElement('span', Number.isInteger(item.detected_count) ? `${item.detected_count} detected`
+        : Number.isInteger(item.available) ? `${item.available} stem${item.available === 1 ? '' : 's'}` : '—', 'inventory-count'));
       list.append(row);
     }
     const mode = isDemo() ? 'demo' : (state.connected && state.inventory?.mode === 'live' ? 'live' : 'offline');
     $('inventory-dot').className = `status-dot ${mode}`;
-    $('inventory-status-text').textContent = isDemo() ? 'Sample inventory · preview only' : state.scanning ? 'Looking at the workbench…' : mode === 'live' ? 'Live vision connected' : 'Live inventory unavailable';
+    $('inventory-status-text').textContent = isDemo() ? 'Sample inventory · preview only' : state.scanning ? 'Looking at the workbench…' : state.inventory?.staged_demo ? 'Staged flowers · fresh tape checks' : mode === 'live' ? 'Live vision connected' : 'Live inventory unavailable';
     const blockers = state.inventory?.blockers || [];
     const detectionCount = state.inventory?.raw_detection_count;
     const needsCalibration = !isDemo() && state.inventory && (!state.inventory.ready || blockers.length > 0);
     $('calibration-notice').hidden = !needsCalibration;
-    $('calibration-title').textContent = 'Camera-to-table calibration needed';
+    $('calibration-title').textContent = 'Inventory needs attention';
     $('calibration-blockers').replaceChildren(...blockers.map((blocker) => textElement('li', blockerText(blocker))));
     if (needsCalibration && !blockers.length) $('calibration-blockers').append(textElement('li', 'Camera-to-table calibration and the grasp reference must be verified before an order can start.'));
     $('detection-evidence').hidden = !Number.isInteger(detectionCount);
-    $('detection-evidence').textContent = Number.isInteger(detectionCount) ? `${detectionCount} raw flower detection${detectionCount === 1 ? '' : 's'} · pick locations still need verification.` : '';
+    $('detection-evidence').textContent = Number.isInteger(detectionCount) ? state.inventory?.staged_demo
+      ? `${detectionCount} tape marks · flower labels assigned by staging.`
+      : `${detectionCount} raw stem detection${detectionCount === 1 ? '' : 's'} · pick locations still need verification.` : '';
     const detectedAt = state.inventory?.detected_at;
     const date = detectedAt ? new Date(typeof detectedAt === 'number' ? (detectedAt < 1e12 ? detectedAt * 1000 : detectedAt) : detectedAt) : null;
     $('inventory-time').textContent = date && !Number.isNaN(date.getTime()) ? `Last scan ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · checked again before building` : 'Inventory is checked again before an order starts.';
@@ -238,6 +244,7 @@
       const source = `${cameraUrl}${stamp ? `${cameraUrl.includes('?') ? '&' : '?'}scan=${stamp}` : ''}`;
       if ($('camera-preview').getAttribute('src') !== source) $('camera-preview').src = source;
       $('camera-view').hidden = false;
+      $('camera-preview').style.cursor = teaching && state.inventory?.staged_demo ? 'crosshair' : '';
     } else $('camera-view').hidden = true;
     renderCandidates();
     renderCameraOverlay();
@@ -253,10 +260,14 @@
     candidates.slice(0, 6).forEach((candidate, index) => {
       const card = textElement('div', '', 'candidate-card');
       const heading = textElement('div', '', 'candidate-heading');
-      const color = [candidate.color && candidate.color !== 'unknown' ? candidate.color : 'color unknown', candidate.variety].filter(Boolean).join(' ');
+      const color = candidate.color && candidate.color !== 'unknown'
+        ? `${candidate.color} ${candidate.variety || 'rose'}` : 'flower unknown';
       heading.append(textElement('strong', `${index + 1}. ${color}`));
-      const score = Number.isFinite(candidate.confidence) ? `${Math.round(candidate.confidence * 100)}% · ` : '';
-      heading.append(textElement('span', `${score}${candidate.pickable ? 'localized' : 'needs setup'}`));
+      const score = candidate.label_source === 'operator_staged_slot' ? 'taught slot · '
+        : Number.isFinite(candidate.confidence) ? `${Math.round(candidate.confidence * 100)}% · ` : '';
+      const graspPreview = Array.isArray(candidate.grasp_pixel) && candidate.grasp_pixel.length === 2
+        && ['pickup_approach', 'pretend_grasp', 'lift'].every((name) => candidate.pickup_poses?.[name]);
+      heading.append(textElement('span', `${score}${candidate.pickable ? 'ready to pick' : graspPreview ? 'grasp preview · motion blocked' : 'vision needs attention'}`));
       card.append(heading);
       if (Array.isArray(candidate.grasp_pixel) && candidate.grasp_pixel.length >= 2) card.append(textElement('p', `Grasp pixel: ${candidate.grasp_pixel.slice(0, 2).map((value) => Math.round(value)).join(', ')}`));
       if (Array.isArray(candidate.world_grasp) && candidate.world_grasp.length >= 3) card.append(textElement('p', `Table grasp: ${candidate.world_grasp.slice(0, 3).map((value) => Number(value).toFixed(1)).join(', ')} mm`));
@@ -280,6 +291,30 @@
       for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
       return node;
     };
+    // Legacy YOLO head boxes are display evidence, never robot grasp locations.
+    for (const flower of state.inventory?.flower_detections || []) {
+      const box = flower.bbox;
+      if (!Array.isArray(box) || box.length !== 4 || !box.every(Number.isFinite)) continue;
+      const color = '#edc6ff';
+      overlay.append(svg('rect', { x: box[0], y: box[1], width: box[2] - box[0], height: box[3] - box[1],
+        fill: 'none', stroke: color, 'stroke-width': Math.max(2, width / 400), 'stroke-dasharray': '6 5' }));
+      const label = svg('text', { x: box[0], y: Math.max(20, box[1] - 8), fill: color,
+        'font-size': Math.max(16, width / 55), 'font-family': 'sans-serif', 'paint-order': 'stroke',
+        stroke: '#183e33', 'stroke-width': 3 });
+      label.textContent = `${flower.colour || 'unknown'} ${flower.variety || 'flower'} · head only`;
+      overlay.append(label);
+    }
+    const workspace = state.inventory?.image_workspace_polygon;
+    if (Array.isArray(workspace) && workspace.length === 4) {
+      overlay.append(svg('polygon', { points: workspace.map((point) => point.join(',')).join(' '),
+        fill: 'none', stroke: '#b9ed92', 'stroke-width': Math.max(2, width / 400), 'stroke-dasharray': '12 8' }));
+    }
+    for (const band of state.inventory?.grasp_bands || []) {
+      const box = band.bbox;
+      if (!Array.isArray(box) || box.length !== 4 || !box.every(Number.isFinite)) continue;
+      overlay.append(svg('rect', { x: box[0], y: box[1], width: box[2] - box[0], height: box[3] - box[1],
+        fill: 'none', stroke: '#67d9ef', 'stroke-width': Math.max(2, width / 400), 'stroke-dasharray': '8 4' }));
+    }
     const candidates = Array.isArray(state.inventory?.candidates) ? state.inventory.candidates : [];
     candidates.forEach((candidate, index) => {
       const box = candidate.bbox;
@@ -333,10 +368,12 @@
     // An empty snapshot must not preserve quantities or imply old detections are current.
     const colors = snapshot.colors.length ? snapshot.colors : stock();
     state.colors = colors.map((item) => ({
+      key: keyOf(item),
       variety: String(item.variety || 'rose'),
       color: String(item.color),
       label: String(item.label || styleFor(item).label),
       available: Number.isInteger(item.available) && item.available >= 0 ? item.available : null,
+      detected_count: Number.isInteger(item.detected_count) ? item.detected_count : null,
       confidence: item.confidence,
     }));
     state.quantities = Object.fromEntries(state.colors.map((item) => [keyOf(item), state.quantities[keyOf(item)] || 0]));
@@ -344,7 +381,10 @@
     invalidatePlan();
     $('demo-banner').hidden = !isDemo();
     setConnection(isDemo() ? 'demo' : state.connected ? 'live' : 'offline', isDemo() ? 'Preview mode' : state.connected ? 'Vision connected' : 'Robot offline');
+    if (snapshot.staged_demo && state.connected) setConnection('live', snapshot.execution_enabled ? 'Staged demo · arm enabled' : 'Staged demo · read-only');
     notice('');
+    if (snapshot.staged_demo) notice('Staged physical demo: reset each flower on its labeled pickup mark before Build. Flower labels come from staging; camera checks confirm the marks.', true);
+    if (snapshot.commissioning) notice('Supervised one-flower limit. Verified calibration, measured workspace and camera alignment are required before motion.', true);
     render();
   }
 
@@ -427,7 +467,8 @@
       cancelled: 'The arrangement was cancelled.',
     };
     $('progress-title').textContent = ['complete', 'completed'].includes(order.status) ? 'A little beauty, arranged.' : order.status === 'stopped' ? 'A moment to pause.' : 'One stem at a time.';
-    $('progress-message').textContent = order.error ? `${messages[order.status] || 'Order needs attention'} ${blockerText(order.error)}` : (messages[order.status] || `Order status: ${order.status}`);
+    const failureStage = order.failure_stage ? `Stage: ${order.failure_stage.replaceAll('_', ' ')}. ` : '';
+    $('progress-message').textContent = order.error ? `${messages[order.status] || 'Order needs attention'} ${failureStage}${blockerText(order.error)}` : (messages[order.status] || `Order status: ${order.status}`);
     $('progress-verification').hidden = typeof order.verification !== 'string' || !order.verification;
     $('progress-verification').textContent = typeof order.verification === 'string' ? order.verification : '';
     const steps = $('order-steps');
@@ -528,6 +569,16 @@
   $('selection-rule').addEventListener('change', () => { invalidatePlan(); renderSummary(); });
   $('camera-preview').addEventListener('load', renderCameraOverlay);
   $('camera-preview').addEventListener('error', () => { $('camera-view').hidden = true; });
+  $('camera-preview').addEventListener('click', (event) => {
+    if (!teaching || !state.inventory?.staged_demo || activeOrder()) return;
+    const image = $('camera-preview');
+    const rect = image.getBoundingClientRect();
+    if (!(image.naturalWidth > 0 && rect.width > 0 && rect.height > 0)) return;
+    const u = Math.min(image.naturalWidth - 1, Math.max(0, Math.round((event.clientX - rect.left) * image.naturalWidth / rect.width)));
+    const v = Math.min(image.naturalHeight - 1, Math.max(0, Math.round((event.clientY - rect.top) * image.naturalHeight / rect.height)));
+    notice(`Teaching pixel: ${u} ${v}. Use these values with the marker capture command. This click only reads the image.`, true);
+    announce(`Teaching pixel ${u}, ${v}.`);
+  });
 
   async function init() {
     render();

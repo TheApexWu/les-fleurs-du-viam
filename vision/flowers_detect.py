@@ -12,7 +12,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from ultralytics import YOLO
 
 WEIGHTS = Path(__file__).parent / "weights" / "flowers.pt"
 _model = None
@@ -23,8 +22,6 @@ STOCK = {"rose": ("yellow", "red", "pink"), "carnation": ("white", "red-white"),
 
 
 def colour_of(bgr_crop, variety):
-    if bgr_crop.size == 0:
-        return "unknown"
     hsv = cv2.cvtColor(bgr_crop, cv2.COLOR_BGR2HSV).reshape(-1, 3).astype(int)
     h, s, v = hsv[:, 0], hsv[:, 1], hsv[:, 2]
     keep = ~((h >= 35) & (h <= 95) & (s > 35))  # drop leaves and stem
@@ -32,26 +29,27 @@ def colour_of(bgr_crop, variety):
     if len(h) == 0:
         return "unknown"
     frac = {
-        "red": np.mean(((h <= 7) | (h >= 173)) & (s > 90)),
-        "pink": np.mean((h >= 135) & (h < 173) & (s > 40)),
+        "red": np.mean(((h <= 7) | (h >= 168)) & (s > 90)),
+        "pink": np.mean((h >= 135) & (h < 168) & (s > 40)),
         "orange": np.mean((h >= 8) & (h <= 19) & (s > 90)),
         "yellow": np.mean((h >= 20) & (h <= 34) & (s > 40)),
     }
     frac["red-white"] = frac["red"] if frac["red"] > 0.03 else 0.0  # carnation stripes: some red among white
-    frac["white"] = 0.05 if frac["red"] <= 0.03 else 0.0
+    frac["white"] = float(np.mean((s < 50) & (v > 140))) if frac["red"] <= 0.03 else 0.0
     allowed = STOCK.get(variety, tuple(frac))
-    best = max(allowed, key=lambda c: frac.get(c, 0.0))
-    return best if frac.get(best, 0.0) >= 0.02 else "unknown"  # nothing coloured: don't invent a stocked colour
+    color = max(allowed, key=lambda c: frac.get(c, 0.0))
+    return color if frac.get(color, 0.0) >= 0.03 else "unknown"
 
 
 def detect(bgr, conf=0.3):
+    from ultralytics import YOLO
+
     global _model
     _model = _model or YOLO(str(WEIGHTS))
     r = _model.predict(bgr, conf=conf, iou=0.4, agnostic_nms=True, verbose=False)[0]
     out = []
     for b in r.boxes:
         x1, y1, x2, y2 = [int(v) for v in b.xyxy[0].tolist()]
-        x1, y1 = max(0, x1), max(0, y1)
         variety = r.names[int(b.cls)]
         out.append({"variety": variety, "colour": colour_of(bgr[y1:y2, x1:x2], variety),
                     "confidence": round(float(b.conf), 2), "bbox": (x1, y1, x2, y2)})
