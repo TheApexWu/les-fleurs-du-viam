@@ -1,0 +1,391 @@
+{
+  "version": 2,
+  "mode": "table",
+  "camera": "cam",
+  "vision_service": "vision-1",
+  "image_size": [
+    1280,
+    720
+  ],
+  "scan_pose": {
+    "x": 288.5501013001384,
+    "y": 233.5668795209395,
+    "z": 558.6634413877227,
+    "o_x": 0.06464743135086021,
+    "o_y": -0.08664942867689115,
+    "o_z": -0.9941391180965085,
+    "theta": 124.78462380152521
+  },
+  "scan_camera_pose": {
+    "x": 365.27823372149476,
+    "y": 258.0773954358777,
+    "z": 649.0295207799059,
+    "o_x": 0.03419471103250546,
+    "o_y": -0.08419748509699546,
+    "o_z": -0.9958621918924042,
+    "theta": -160.85764168252123
+  },
+  "table_plane_z_mm": -10.0,
+  "workspace_bounds": {
+    "x": [
+      182.0429962291112,
+      653.332226289421
+    ],
+    "y": [
+      -46.867471463382856,
+      513.4975583433364
+    ],
+    "z": [
+      -15.0,
+      139.98194767009213
+    ]
+  },
+  "reference": {
+    "pixel": [
+      746.0174672489082,
+      560.9868995633187
+    ],
+    "axis_pixels": [
+      [
+        746.7841201773679,
+        653.0154745362162
+      ],
+      [
+        747.3272835741246,
+        449.9901742042694
+      ]
+    ],
+    "pickup_poses": {
+      "pickup_approach": {
+        "x": 270.1119658262158,
+        "y": 143.42122664723638,
+        "z": 86.47471504357742,
+        "o_x": -0.021340669865617588,
+        "o_y": -0.05157503675723346,
+        "o_z": -0.9984410805817119,
+        "theta": 67.80359454537272
+      },
+      "pretend_grasp": {
+        "x": 264.6637636525999,
+        "y": 142.54618312474403,
+        "z": 67.20944087975374,
+        "o_x": 0.005754637941013947,
+        "o_y": -0.02868564827798955,
+        "o_z": -0.9995719172350929,
+        "theta": 101.42584598039387
+      },
+      "lift": {
+        "x": 268.97658994741363,
+        "y": 149.28169985389232,
+        "z": 124.98194767009213,
+        "o_x": -0.0055179760799188475,
+        "o_y": -0.052007615690955925,
+        "o_z": -0.9986314434515482,
+        "theta": 83.26043809339394
+      }
+    },
+    "verified": false
+  },
+  "minimum_confidence": 0.5,
+  "max_pickup_offset_mm": 60,
+  "max_yaw_delta_deg": 10,
+  "minimum_separation_mm": 40,
+  "grasp_fraction": 0.6,
+  "scan_captured_at": "2026-10-17T15:32:55.085901+00:00",
+  "onsite_measurements": {
+    "reference_frame_image": "logs/onsite-inventory-20261017T153313Z/frame.jpg",
+    "reference_grasp_source": "Operator-confirmed band center; sampled yellow-band component centroid in saved reference frame",
+    "reference_axis_source": "Exposed bare-stem PCA around original taught reference band in saved 15:33:13 frame; yellow marker box excluded from stem mask",
+    "reported_inner_rectangle_mm": {
+      "height": 457,
+      "breadth": 550
+    },
+    "table_z_source": "provisional: operator approximate inventory surface 10 mm below base mounting plane; world datum requires validation",
+    "table_z_status": "unverified: base height approximate; camera optical-frame offset and projected world points require validation",
+    "projected_reference_world_mm": [
+      239.25487094850115,
+      120.86328671975807,
+      -10.0
+    ],
+    "taught_gripper_frame_mm": [
+      264.6637636525999,
+      142.54618312474403,
+      72.20944087975374
+    ],
+    "reference_to_gripper_xy_offset_mm": [
+      25.408892704098776,
+      21.682896404985968
+    ],
+    "reference_to_gripper_xy_distance_mm": 33.40299125763676,
+    "image_workspace_polygon_source": "Manually inset from inner tape corners in saved reference frame; excludes border tape; not robot-world bounds",
+    "base_mounting_surface_above_inventory_mm": 10.0,
+    "base_measurement_precision": "operator approximate: about 10 mm",
+    "base_plane_world_z_assumption_mm": 0.0,
+    "base_derived_table_z_mm": -10.0,
+    "camera_height_derived_table_z_mm": null,
+    "camera_height_prediction_from_base_mm": 659.0295207799059,
+    "latest_live_observation": "Tape laid across the rose near the grasp band. Latest live scan returned zero stem detections; last unobscured frame localized one red rose. No movement commands sent.",
+    "camera_housing_height_above_table_mm": 640,
+    "camera_height_measurement_reference": "Operator clarified 640 mm was measured to camera housing; precise housing point unspecified",
+    "camera_optical_center_height_above_table_mm": null,
+    "camera_housing_measurement_usage": "Context only; cannot derive optical-center height or table Z without a verified housing-to-optical-frame offset",
+    "depth_plane_diagnostic": "logs/table-depth-20261017T155221Z/plane-diagnostic.json",
+    "depth_optical_center_to_plane_distance_mm": 646.1000699354379,
+    "apparent_depth_plane_world_tilt_deg": 2.260669974694854,
+    "depth_diagnostic_status": "Operator confirmed parallel planes; apparent 2.26 degree tilt indicates configured camera/depth alignment needs correction or validation",
+    "parallel_inventory_and_base_planes_confirmed": true,
+    "camera_correction_candidate": "logs/table-depth-20261017T155221Z/camera-correction-candidate.json",
+    "camera_correction_status": "applied to read-only projection preview only; not applied to live robot frame configuration; physical transfers explicitly blocked",
+    "reported_inner_rectangle_source": "Operator remeasured between inner tape edges; 457 mm along stems and 550 mm across; supersedes earlier 490 mm height",
+    "reported_inner_rectangle_updated_at": "2026-10-17T16:25:36.604681+00:00",
+    "candidate_rectangle_check": {
+      "status": "offline consistency check only; approximate image corners, not physical pickup accuracy",
+      "projected_widths_mm": [
+        552.9875685762222,
+        552.7981477086639
+      ],
+      "projected_heights_mm": [
+        465.3570009175512,
+        455.28242379815083
+      ],
+      "measured_width_mm": 550,
+      "measured_height_mm": 457,
+      "maximum_edge_residual_mm": 8.357000917551204
+    },
+    "latest_live_frame_image": "logs/onsite-inventory-20261017T165020Z/frame.jpg",
+    "ruler_check_baseline": {
+      "folder": "logs/onsite-inventory-20261017T162659Z",
+      "image": "logs/onsite-inventory-20261017T162659Z/frame.jpg",
+      "status": "stationary-arm image baseline for relative ruler displacement; not a replacement for the original taught reference",
+      "grasp_pixel": [
+        761.201646090535,
+        565.7283950617284
+      ],
+      "candidate_world_grasp_mm": [
+        260.90023908689994,
+        128.31407433262711,
+        -10.0
+      ],
+      "distance_from_original_reference_mm": 11.40532596311086,
+      "projection": "offline camera correction candidate only"
+    },
+    "pending_ruler_check": {
+      "status": "measurement recorded; fixed ruler scale check required",
+      "baseline_folder": "logs/onsite-inventory-20261017T163019Z",
+      "requested_displacement_mm": 20,
+      "direction": "toward top of camera image, parallel to a side 457 mm tape edge",
+      "orientation": "unchanged; translate whole rose without turning",
+      "robot_motion": "none; keep arm and camera fixed",
+      "purpose": "second-axis relative projection check only; does not verify robot-world alignment or enable picking"
+    },
+    "ruler_checks": [
+      {
+        "requested_displacement_mm": 50.0,
+        "direction": "left",
+        "measured_displacement_mm": 52.6764448326073,
+        "length_residual_mm": 2.6764448326073023,
+        "along_requested_direction_mm": 52.38596401809527,
+        "across_requested_direction_mm": -5.524365492755559,
+        "stem_angle_change_deg": 0.3204343682385513,
+        "evidence": "logs/onsite-inventory-20261017T163019Z/ruler-check.json",
+        "status": "offline diagnostic recorded; placement error and projection error not separated; not verified robot-world accuracy"
+      },
+      {
+        "requested_displacement_mm": 20.0,
+        "direction": "up",
+        "measured_displacement_mm": 23.465634424704174,
+        "length_residual_mm": 3.4656344247041737,
+        "along_requested_direction_mm": 23.463423171734345,
+        "across_requested_direction_mm": -0.3221366448904881,
+        "stem_angle_change_deg": 0.5493938239189333,
+        "evidence": "logs/onsite-inventory-20261017T163231Z/ruler-check.json",
+        "status": "offline diagnostic recorded; placement error and projection error not separated; not verified robot-world accuracy"
+      }
+    ],
+    "pending_static_ruler_check": {
+      "status": "assessment finished using available evidence; no further ruler placement requested",
+      "vertical_100_mm_span_range_mm": [
+        99.65609141550549,
+        100.34348155360102
+      ],
+      "vertical_200_mm_span_mm": 199.9995729691065,
+      "horizontal_depth_accounted_100_mm_span_mm": 100.05755098751241,
+      "uncertainty": "roughly 2 mm image endpoint sensitivity; depth and other systematic errors not fully quantified"
+    },
+    "static_ruler_checks": [
+      {
+        "image": "logs/onsite-inventory-20261017T163458Z/frame.jpg",
+        "depth_evidence": "logs/table-depth-20261017T163614Z/ruler-depth-diagnostic.json",
+        "status": "not accepted as flat-table metric reference; visible endpoints obscured and blade elevated in depth data",
+        "blade_height_above_neighbor_white_median_mm": 16.308175988318453,
+        "blade_segment_height_range_mm": [
+          12.217871771871273,
+          17.953412681587565
+        ],
+        "uncertainty": "single-frame depth diagnostic, approximate height; not independent robot-world calibration"
+      },
+      {
+        "image": "logs/onsite-inventory-20261017T164000Z/frame.jpg",
+        "scale_evidence": "logs/onsite-inventory-20261017T164000Z/static-ruler-check.json",
+        "depth_evidence": "logs/table-depth-20261017T164015Z/ruler-depth-diagnostic.json",
+        "orientation": "roughly vertical in camera image",
+        "status": "supports offline candidate projection scale; image endpoint uncertainty about 2.2 mm per span, systematic frame errors not established",
+        "spans": [
+          {
+            "ticks_cm": [
+              4,
+              14
+            ],
+            "expected_mm": 100,
+            "projected_mm": 99.65609141550549,
+            "residual_mm": -0.343908584494514,
+            "range_with_each_endpoint_shifted_1_5_pixels_mm": [
+              97.49184464286455,
+              101.82034512967721
+            ]
+          },
+          {
+            "ticks_cm": [
+              8,
+              18
+            ],
+            "expected_mm": 100,
+            "projected_mm": 99.70391930715101,
+            "residual_mm": -0.29608069284898875,
+            "range_with_each_endpoint_shifted_1_5_pixels_mm": [
+              97.55688843233071,
+              101.85095707158857
+            ]
+          },
+          {
+            "ticks_cm": [
+              14,
+              24
+            ],
+            "expected_mm": 100,
+            "projected_mm": 100.34348155360102,
+            "residual_mm": 0.3434815536010234,
+            "range_with_each_endpoint_shifted_1_5_pixels_mm": [
+              98.22211745869241,
+              102.46485249942764
+            ]
+          },
+          {
+            "ticks_cm": [
+              4,
+              24
+            ],
+            "expected_mm": 200,
+            "projected_mm": 199.9995729691065,
+            "residual_mm": -0.00042703089349060974,
+            "range_with_each_endpoint_shifted_1_5_pixels_mm": [
+              197.85673739549412,
+              202.14242233516768
+            ]
+          }
+        ],
+        "ruler_relative_to_neighbor_white_median_mm": -2.8659119097866324,
+        "depth_interpretation": "consistent with tabletop within few-mm single-frame scatter; thin reflective ruler surface response and optical alignment uncertainty not resolved"
+      },
+      {
+        "image": "logs/onsite-inventory-20261017T164328Z/frame.jpg",
+        "scale_evidence": "logs/onsite-inventory-20261017T164328Z/horizontal-ruler-check.json",
+        "orientation": "horizontal",
+        "status": "coarse same-ruler length comparison only; no accepted horizontal 100 mm tick measurement because of glare/low contrast",
+        "same_ruler_length_difference_mm": 3.688755423992461
+      },
+      {
+        "image": "logs/onsite-inventory-20261017T165020Z/frame.jpg",
+        "depth_evidence": "logs/table-depth-20261017T165058Z/ruler-depth-diagnostic.json",
+        "orientation": "horizontal tape, height accounted using optical depth",
+        "known_span_mm": 100,
+        "measured_span_mm": 100.05755098751241,
+        "metric_marks_cm": [
+          20,
+          30
+        ],
+        "status": "consistent coarse metric scale check; approximate image marks and single-frame depth uncertainty apply; not robot-world calibration"
+      }
+    ],
+    "remaining_physical_validation": [
+      "Independent robot-world X/Y direction and grasp alignment checks at multiple locations",
+      "Measured conservative robot-world workspace bounds and table Z confirmation",
+      "Supervised pickup orientation and clearance validation with configured collision checks preserved"
+    ]
+  },
+  "grasp_mode": "yellow_band",
+  "image_workspace_polygon": [
+    [
+      246,
+      26
+    ],
+    [
+      987,
+      44
+    ],
+    [
+      999,
+      660
+    ],
+    [
+      224,
+      663
+    ]
+  ],
+  "projection_preview": {
+    "reported_camera_pose": {
+      "x": 365.27823372149476,
+      "y": 258.0773954358777,
+      "z": 649.0295207799059,
+      "o_x": 0.03419471103250546,
+      "o_y": -0.08419748509699546,
+      "o_z": -0.9958621918924042,
+      "theta": -160.85764168252123
+    },
+    "camera_pose_world": {
+      "x": 365.27823372149476,
+      "y": 258.0773954358777,
+      "z": 636.1000699354379,
+      "o_x": 0.0665064255564874,
+      "o_y": -0.06183024844145267,
+      "o_z": -0.995868422904034,
+      "theta": -135.77374297214072
+    },
+    "intrinsics": {
+      "fx": 906.5222778320312,
+      "fy": 906.6478271484375,
+      "cx": 645.4244995117188,
+      "cy": 352.3562316894531,
+      "width": 1280,
+      "height": 720
+    },
+    "source": "logs/table-depth-20261017T155221Z/camera-correction-candidate.json",
+    "status": "unverified correction for read-only pickup preview only"
+  },
+  "commissioning": {
+    "version": 1,
+    "world_inventory_polygon": [
+      [
+        625.9937482594535,
+        513.4975583433364
+      ],
+      [
+        653.332226289421,
+        -27.46057201237369
+      ],
+      [
+        200.45686715400166,
+        -46.867471463382856
+      ],
+      [
+        182.0429962291112,
+        494.7106730360865
+      ]
+    ],
+    "pickup_edge_margin_mm": 25,
+    "max_orders_per_process": 1,
+    "max_flowers_per_order": 1,
+    "status": "Unverified geometry accepted only for a supervised one-flower commissioning attempt",
+    "workspace_source": "Projected measured taped area; axis-aligned bounds plus polygon/edge checks; not independently surveyed robot-world limits"
+  }
+}

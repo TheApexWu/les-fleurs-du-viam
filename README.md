@@ -15,16 +15,18 @@ What works:
 - Teleop dashboard with hold-to-move, limits and a log of every move (median error 0.13 mm over 103 moves).
 - Every planned move is dry-run first. The taught loop (approach, grasp, lift, vase, release) planned and ran end to end on armfarm12 several times between 18:39 and 18:54 UTC.
 - Flower detector v3 (`vision/weights/flowers.pt`): rose, carnation, lily by YOLOv8n, colour from bloom pixels. v1 and v2 are kept for rollback.
-- Bouquet Studio frontend (`bouquet_ui/`) with the taste lens: a rule-based score for harmony, rhythm, proportion and focus, plus a one-stem suggestion.
+- Bouquet Studio frontend (`bouquet_ui/`) with the taste lens, now wired to real orders by `bouquet.py` (`python3 bouquet.py serve --demo` for the UI alone).
+- Camera-to-table localization and staged pickup (`bouquet_localization.py`, `bouquet_staged.py`); see [VISION_BOUQUET.md](VISION_BOUQUET.md) and [STAGED_DEMO.md](STAGED_DEMO.md).
 
 What did not work: no stem was picked up in the live demo.
 
-What the robot logs show (planner goals pulled from armfarm12, 18:10 to 19:57 UTC):
-- Frames are consistent. Each commanded arm pose equals its hand-taught gripper pose moved 105 mm back along the gripper axis (residual under 3.5 mm on 4 poses; 78 to 105 mm without the shift). The taught path itself is not miscalibrated.
-- The three camera-driven grasps (19:15 to 19:23) kept x fixed at 264 and z fixed at 202 (gripper point about 97, versus 72 for the taught grasp) and took only y from the camera: 303, 190 and 288, against 142 for the taught grasp. A stem that was off in x or lower than 97 could not be reached.
+What the robot logs and the calibration files show (planner goals from armfarm12, 18:10 to 19:57 UTC):
+- Frames are consistent. Each commanded arm pose equals its hand-taught gripper pose moved 105 mm back along the gripper axis (residual under 3.5 mm on 4 poses; 78 to 105 mm without the shift).
+- The goals at z 202 between 19:15 and 19:23 are the staged alignment hover: taught grasp 67 + 30 mm hover = 97 at the gripper point, 202 at the flange. The descent to the stem is not in the planner log, so the logs cannot say whether the jaws reached it.
+- The camera calibration was never verified on site, by its own record in `vision_inventory.json`: table height is a provisional -10 (an earlier depth reading gave about -23), the depth plane reads 2.3 degrees tilted, the projected reference lands 33 mm from the taught grasp, and `staged_demo.json` has no verified digest. That is why physical pickup ran from operator-aligned hovers rather than from the camera.
 - No planner goals were logged after 19:25 UTC.
 
-Next, if this continues: get x and z from the depth camera, not only y; check the camera-to-gripper offset with one stem at a known spot; and grasp 25 mm lower, at the taught height.
+Next, if this continues: touch the table once with the fingertips to fix its height, check the projection against a ruler at two known spots, then record the verified digest.
 
 ## Run it
 
@@ -65,6 +67,8 @@ Turn it off with `PLAN_CHECK = False` in `config.py`.
 | File | What it does |
 |---|---|
 | `flowers.py` | Planner steps: `resources`, `teach`, `plan_check`, `photo` |
+| `bouquet.py`, `bouquet_ui/` | Bouquet color/quantity selector, read-only inventory and order API |
+| `bouquet_vision.py`, `bouquet_localization.py` | Trained stem detections, blossom pairing and measured table localization |
 | `replay.py` | Plays back the marked moments of a teleop session |
 | `config.py` | Names, gripper width, wrist angle, the measured vase |
 | `ai.py` | Blind critic: photo to a guessed feeling |

@@ -1,3 +1,5 @@
-viam-sdk
+viam-sdk>=0.84.0
 anthropic
-aiohttp
+aiohttp>=3.10
+Pillow>=10
+-r vision/requirements.txt
