@@ -15,7 +15,8 @@ from teleop import STEPS_MM, Jogger
 
 PORT = 8765
 HOLDABLE = set("wasdrfqejloc")
-HEARTBEAT_TIMEOUT_S = 0.6  # no heartbeat from the page for this long while holding: stop the arm
+HEARTBEAT_TIMEOUT_S = 0.6
+MAX_HOLD_STEPS = 40  # a hold that never sees its keyup still ends  # no heartbeat from the page for this long while holding: stop the arm
 
 
 async def build_app():
@@ -67,7 +68,7 @@ async def build_app():
                 msg = await jog.handle(key)
                 hold["steps"] += 1
                 lines.append(msg)
-                if msg.startswith(("refused", "error", "busy", "unknown")):
+                if msg.startswith(("refused", "error", "busy", "unknown", "stopped")) or hold["steps"] >= MAX_HOLD_STEPS:
                     break
         finally:
             if hold["key"] == key:
@@ -166,6 +167,7 @@ window.addEventListener('blur',()=>held&&he(held));
 document.addEventListener('visibilitychange',()=>document.hidden&&held&&he(held));
 function rot(){angle=(angle+90)%360;document.getElementById('cam').style.transform=`rotate(${angle}deg)`;document.getElementById('rot').innerHTML=angle+'&deg;'}
 document.addEventListener('keydown',e=>{
+ if(e.metaKey||e.ctrlKey||e.altKey)return; // Cmd+C etc. get no keyup on macOS: never start a hold from them
  if(e.repeat){if('wasdrfqejloc'.includes(e.key.toLowerCase()))e.preventDefault();return}
  const key=e.key===' '?' ':e.key==='Tab'?'\\t':e.key.toLowerCase();
  if(key===' '){e.preventDefault();if(held)he(held);return stop()}
