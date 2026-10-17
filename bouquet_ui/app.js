@@ -295,9 +295,35 @@
     });
   }
 
+  function renderTaste() {
+    if (!window.Taste) return;
+    const stems = state.colors.map((item) => ({ ...item, quantity: state.quantities[keyOf(item)] || 0, swatch: styleFor(item).swatch }));
+    const read = window.Taste.evaluate(stems);
+    $('taste-panel').hidden = !read;
+    if (!read) return;
+    $('taste-sketch').innerHTML = window.Taste.sketch(stems.filter((s) => s.quantity > 0));
+    $('taste-score').textContent = String(read.overall);
+    $('taste-mood').textContent = read.mood.length ? `Reads as ${read.mood.join(' and ')}.` : '';
+    $('taste-axes').replaceChildren(...read.axes.map(([name, score]) => {
+      const row = textElement('div', '', 'taste-axis');
+      const bar = textElement('span', '', 'taste-bar');
+      bar.style.setProperty('--w', `${score}%`);
+      row.append(textElement('span', name), bar, textElement('span', String(score), 'taste-num'));
+      return row;
+    }));
+    $('taste-critique').textContent = read.critique;
+    const apply = $('taste-apply');
+    apply.hidden = !read.suggestion || !!activeOrder() || total() >= MAX_ORDER_SIZE;
+    if (read.suggestion) {
+      apply.textContent = `Try it: ${read.suggestion.text}`;
+      apply.onclick = () => { state.quantities[read.suggestion.key] = (state.quantities[read.suggestion.key] || 0) + 1; invalidatePlan(); render(); announce(read.suggestion.text); };
+    }
+  }
+
   function render() {
     renderFlowers();
     renderSummary();
+    renderTaste();
     renderInventory();
   }
 
