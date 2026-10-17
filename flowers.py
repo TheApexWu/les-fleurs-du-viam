@@ -401,7 +401,7 @@ class FlowerBot:
 STEPS = {name: getattr(FlowerBot, name) for name in
          ("resources", "teach", "plan_check", "open_gripper", "grip_test", "grip_calibrate", "pick", "go_hub", "move_pose",
           "pretend_loop", "pick_and_drop", "vase_one", "fill",
-          "insert_one", "sogetsu", "photo", "say")}
+          "insert_one", "sogetsu", "photo")}
 
 
 async def main(verb="resources", *args):

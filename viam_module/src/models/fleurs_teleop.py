@@ -7,8 +7,8 @@ Use it from the app's CONTROL tab (DoCommand on this service):
   {"command": "state"}                    latest pose, joints, gripper, step size
   {"command": "log_tail", "n": 10}        the last n replies
 
-Config attributes: {"arm": "arm"} required; optional "vase" {x, y, rim_z, rim_r}, "table_top_z",
-"grip_stem", "grip_speed". Recordings go to $VIAM_MODULE_DATA (or /tmp/fleurs-du-viam) on the robot.
+Config attributes: {"arm": "arm"} required; optional "gripper" (enables G = grab), "vase" {x, y, rim_z, rim_r},
+"table_top_z". Recordings go to $VIAM_MODULE_DATA (or /tmp/fleurs-du-viam) on the robot.
 """
 import asyncio
 import os
@@ -35,17 +35,16 @@ class FleursTeleop(Generic, EasyResource):
         attrs = struct_to_dict(config.attributes)
         if not isinstance(attrs.get("arm"), str):
             raise Exception('"arm" (the arm component name) is required')
-        return [attrs["arm"]], []
+        return [attrs["arm"]] + ([attrs["gripper"]] if isinstance(attrs.get("gripper"), str) else []), []
 
     @classmethod
     def new(cls, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]) -> Self:
         self = super().new(config, dependencies)
         attrs = struct_to_dict(config.attributes)
         core.configure(vase=attrs.get("vase"), table_top_z=attrs.get("table_top_z"),
-                       grip_speed=attrs.get("grip_speed"), grip_stem=attrs.get("grip_stem"),
                        log_dir=os.environ.get("VIAM_MODULE_DATA", "/tmp/fleurs-du-viam"))
-        arm = next(d for n, d in dependencies.items() if n.name == attrs["arm"])
-        self.jog = core.Jogger(arm)
+        deps = {n.name: d for n, d in dependencies.items()}
+        self.jog = core.Jogger(deps[attrs["arm"]], deps.get(attrs.get("gripper")))
         self.replies: list[str] = []
         self._start = asyncio.create_task(self.jog.start())
         return self

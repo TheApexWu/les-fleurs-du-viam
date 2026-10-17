@@ -11,7 +11,7 @@ Viam generic service so it can be driven from the Viam app's CONTROL tab.
    ```json
    {"arm": "arm"}
    ```
-   Optional: `"vase": {"x": 300, "y": -283, "rim_z": 420, "rim_r": 59}`, `"table_top_z"`, `"grip_stem"`, `"grip_speed"`.
+   Optional: `"vase": {"x": 300, "y": -283, "rim_z": 420, "rim_r": 59}`, `"table_top_z"`, `"gripper": "gripper"` (enables G = grab).
 4. The model triplet in the code is `apexwu:fleurs-du-viam:teleop`; if the app assigns your org's namespace,
    change `ModelFamily(...)` in `fleurs_teleop.py` to match.
 

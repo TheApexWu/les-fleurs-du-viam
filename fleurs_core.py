@@ -22,18 +22,15 @@ FIELDS = ("x", "y", "z", "o_x", "o_y", "o_z", "theta")
 # reads no config and runs unchanged on the laptop or inside the Viam module on the robot.
 VASE = {"x": 300.0, "y": -283.0, "rim_z": 420.0, "rim_r": 59.0}
 TABLE_TOP_Z = -23.0
-GRIP_SPEED, GRIP_STEM = 1500, 120
 LOG_DIR = Path(__file__).parent / "recordings"
 X_MAX, Y_MIN, Z_MAX = 650.0, -420.0, 900.0
 FLOOR_Z = VASE_KEEPOUT_R = VASE_MIN_Z = 0.0
 
 
-def configure(vase=None, table_top_z=None, grip_speed=None, grip_stem=None, log_dir=None):
-    global VASE, TABLE_TOP_Z, GRIP_SPEED, GRIP_STEM, LOG_DIR, FLOOR_Z, VASE_KEEPOUT_R, VASE_MIN_Z
+def configure(vase=None, table_top_z=None, log_dir=None):
+    global VASE, TABLE_TOP_Z, LOG_DIR, FLOOR_Z, VASE_KEEPOUT_R, VASE_MIN_Z
     VASE = dict(vase) if vase else VASE
     TABLE_TOP_Z = TABLE_TOP_Z if table_top_z is None else table_top_z
-    GRIP_SPEED = GRIP_SPEED if grip_speed is None else grip_speed
-    GRIP_STEM = GRIP_STEM if grip_stem is None else grip_stem
     LOG_DIR = Path(log_dir) if log_dir else LOG_DIR
     FLOOR_Z = TABLE_TOP_Z + 30.0
     VASE_KEEPOUT_R = VASE["rim_r"] + 20.0
@@ -79,10 +76,11 @@ def arc_ok(x: float, y: float, z: float, d_deg: float) -> tuple[bool, str]:
 class Jogger:
     """One arm, one log, one move at a time. Shared by the terminal and the dashboard."""
 
-    def __init__(self, arm):
-        self.arm = arm
+    def __init__(self, arm, gripper=None):
+        self.arm, self.gripper = arm, gripper
         self.step_i = 0
         self.busy = asyncio.Lock()
+        self.stops = 0  # bumped by stop(); a step started before a stop must not move after it
         path = LOG_DIR / f"teleop-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         self.log_path, self.log = path, path.open("a")
@@ -93,7 +91,6 @@ class Jogger:
 
     async def start(self):
         await self.arm.do_command({"set_speed": TELEOP_DEG_S})
-        await self.arm.do_command({"set_gripper_speed": GRIP_SPEED})
         self._trace_task = asyncio.create_task(self._trace())
 
     async def _trace(self):
@@ -133,6 +130,7 @@ class Jogger:
         return pose, [round(v, 3) for v in j.values], g
 
     async def stop(self) -> str:
+        self.stops += 1
         await self.arm.stop()  # never waits for the lock: stop must always get through
         self.write({"cmd": "stop"})
         return "STOP"
@@ -148,14 +146,15 @@ class Jogger:
         if self.busy.locked():
             return "busy: previous move still running, key ignored"
         async with self.busy:
+            gen = self.stops
             try:
-                return await self._run(key, label)
+                return await self._run(key, label, gen)
             except Exception as e:  # noqa: BLE001 - e.g. an unreachable target; stop, log, keep the session
                 await self.arm.stop()
                 self.write({"cmd": {"key": key}, "error": f"{type(e).__name__}: {e}"[:300]})
                 return f"error, arm stopped: {type(e).__name__}: {str(e)[:120]}"
 
-    async def _run(self, key: str, label: str) -> str:
+    async def _run(self, key: str, label: str, gen: int = 0) -> str:
         from viam.proto.common import Pose
         pose, joints, g = await self.snapshot()
         if key in MOVES:
@@ -175,6 +174,8 @@ class Jogger:
                 return f"refused: {why}"
             tx, ty = swing(pose["x"], pose["y"], d)
             target = dict(pose, x=tx, y=ty)
+            if self.stops != gen:
+                return "stopped before moving"
             await self.arm.move_to_joint_positions(JointPositions(values=[joints[0] + d] + joints[1:]))
             reached, joints, g = await self.snapshot()
             err = math.dist((tx, ty, pose["z"]), (reached["x"], reached["y"], reached["z"]))
@@ -188,11 +189,17 @@ class Jogger:
             target = dict(pose, theta=pose["theta"] + (SPIN_DEG if key == "e" else -SPIN_DEG))
             cmd = {"key": key, "d_theta": target["theta"] - pose["theta"]}
         elif key in ("o", "c", "g"):
-            width = GRIP_STEM if key == "g" else (g or 0) + (GRIP_STEP if key == "o" else -GRIP_STEP)
-            width = float(max(0, min(850, width)))
-            await self.arm.do_command({"setup_gripper": True, "move_gripper": width})
+            if key == "g":  # the gripper's own grab: closes until it meets the stem, module defaults
+                if self.gripper is None:
+                    return "no gripper component given; G unavailable"
+                await self.gripper.grab()
+                cmd = {"key": key, "grab": True}
+            else:
+                width = float(max(0, min(850, (g or 0) + (GRIP_STEP if key == "o" else -GRIP_STEP))))
+                await self.arm.do_command({"setup_gripper": True, "move_gripper": width})
+                cmd = {"key": key, "gripper_target": width}
             pose, joints, g2 = await self.snapshot()
-            self.write({"cmd": {"key": key, "gripper_target": width}, "pose": pose, "joints": joints, "gripper": g2})
+            self.write({"cmd": cmd, "pose": pose, "joints": joints, "gripper": g2})
             self.last = {"pose": pose, "gripper": g2}
             return f"gripper {g:.0f} -> {g2:.0f}"
         elif key == "m":
@@ -201,6 +208,8 @@ class Jogger:
         else:
             return f"unknown key {key!r}"
 
+        if self.stops != gen:
+            return "stopped before moving"
         await self.arm.move_to_position(Pose(**target))
         reached, joints, g = await self.snapshot()
         err = math.dist((target["x"], target["y"], target["z"]), (reached["x"], reached["y"], reached["z"]))

@@ -9,19 +9,22 @@ Viam hackathon, 16-17 Oct 2026, robot `armfarm12` (xArm, wrist camera, gripper).
 
 **Today's plan, mental model and task list: [TODAY.md](TODAY.md). Diagrams of how it all fits: [ARCHITECTURE.md](ARCHITECTURE.md).** For the saved-pose flowerless loop and one-stem gripper run, see [GRIPPER_MANUAL.md](GRIPPER_MANUAL.md).
 
-## Where we are (Fri 16 Oct, ~4 pm)
+## Final state (Sat 17 Oct, after the demo)
 
-- Connected to armfarm12. The team's machine config (vase obstacle, rose detectors, data logger) is snapshotted in `viam/`.
-- Teleop works: dashboard with hold-to-move, base swing, limits, and a log of every move (median error 0.13 mm over 103 moves).
-- Every planned move is dry-run first (`plan_check`). Over the vase the gripper reaches z 600 at most, so roses need a side grasp.
-- `replay.py` plays back the moments marked with M in a teleop session. **Not run on the arm yet.**
-- The semantic gripper calibration succeeded on one stem: reported aperture 45 and holding sensor true. Confirm a stem visually; the sensor is advisory.
-- The five saved waypoints in `taught_poses.json` support `pretend_loop` and the supervised one-stem `pick_and_drop`; see [GRIPPER_MANUAL.md](GRIPPER_MANUAL.md). The full physical flower transfer still needs a supervised run.
+What works:
+- Teleop dashboard with hold-to-move, limits and a log of every move (median error 0.13 mm over 103 moves).
+- Every planned move is dry-run first. The taught loop (approach, grasp, lift, vase, release) planned and ran end to end on armfarm12 several times between 18:39 and 18:54 UTC.
+- Flower detector v3 (`vision/weights/flowers.pt`): rose, carnation, lily by YOLOv8n, colour from bloom pixels. v1 and v2 are kept for rollback.
+- Bouquet Studio frontend (`bouquet_ui/`) with the taste lens: a rule-based score for harmony, rhythm, proportion and focus, plus a one-stem suggestion.
 
-Next:
-1. Reconcile the vase position: our measurement (300, -283, rim z 420) vs the team's config (360, 234, top ~242).
-2. Record one demo on the dashboard, pressing M at approach, grasp, lift, over the vase, release.
-3. `python replay.py recordings/teleop-<time>.jsonl` once, slowly, with someone at the stop button.
+What did not work: no stem was picked up in the live demo.
+
+What the robot logs show (planner goals pulled from armfarm12, 18:10 to 19:57 UTC):
+- Frames are consistent. Each commanded arm pose equals its hand-taught gripper pose moved 105 mm back along the gripper axis (residual under 3.5 mm on 4 poses; 78 to 105 mm without the shift). The taught path itself is not miscalibrated.
+- The three camera-driven grasps (19:15 to 19:23) kept x fixed at 264 and z fixed at 202 (gripper point about 97, versus 72 for the taught grasp) and took only y from the camera: 303, 190 and 288, against 142 for the taught grasp. A stem that was off in x or lower than 97 could not be reached.
+- No planner goals were logged after 19:25 UTC.
+
+Next, if this continues: get x and z from the depth camera, not only y; check the camera-to-gripper offset with one stem at a known spot; and grasp 25 mm lower, at the taught height.
 
 ## Run it
 
@@ -44,7 +47,7 @@ python dashboard.py      # then open http://localhost:8765  (camera, pose, jog b
 python teleop.py         # same thing in the terminal
 ```
 Exit manual mode first, one person at the stop button. Keys: W/S x, A/D y, R/F z, Q/E wrist spin,
-O/C gripper step, G gentle hold, Tab 20/5 mm steps, M mark a moment, Space STOP.
+O/C gripper step, G grab (gripper default), Tab 20/5 mm steps, M mark a moment, Space STOP.
 Every session writes `recordings/teleop-<time>.jsonl` (each command, the pose reached, error in mm, marks)
 and `recordings/teleop-<time>-trace.csv` (position, joints, gripper ~5x/s, also mid-move).
 Limits refuse moves into the table, walls, ceiling, or fingers into the vase. Nothing else is avoided.
