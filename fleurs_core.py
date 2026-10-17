@@ -83,6 +83,7 @@ class Jogger:
         self.arm = arm
         self.step_i = 0
         self.busy = asyncio.Lock()
+        self.stops = 0  # bumped by stop(); a step started before a stop must not move after it
         path = LOG_DIR / f"teleop-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         self.log_path, self.log = path, path.open("a")
@@ -133,6 +134,7 @@ class Jogger:
         return pose, [round(v, 3) for v in j.values], g
 
     async def stop(self) -> str:
+        self.stops += 1
         await self.arm.stop()  # never waits for the lock: stop must always get through
         self.write({"cmd": "stop"})
         return "STOP"
@@ -148,14 +150,15 @@ class Jogger:
         if self.busy.locked():
             return "busy: previous move still running, key ignored"
         async with self.busy:
+            gen = self.stops
             try:
-                return await self._run(key, label)
+                return await self._run(key, label, gen)
             except Exception as e:  # noqa: BLE001 - e.g. an unreachable target; stop, log, keep the session
                 await self.arm.stop()
                 self.write({"cmd": {"key": key}, "error": f"{type(e).__name__}: {e}"[:300]})
                 return f"error, arm stopped: {type(e).__name__}: {str(e)[:120]}"
 
-    async def _run(self, key: str, label: str) -> str:
+    async def _run(self, key: str, label: str, gen: int = 0) -> str:
         from viam.proto.common import Pose
         pose, joints, g = await self.snapshot()
         if key in MOVES:
@@ -175,6 +178,8 @@ class Jogger:
                 return f"refused: {why}"
             tx, ty = swing(pose["x"], pose["y"], d)
             target = dict(pose, x=tx, y=ty)
+            if self.stops != gen:
+                return "stopped before moving"
             await self.arm.move_to_joint_positions(JointPositions(values=[joints[0] + d] + joints[1:]))
             reached, joints, g = await self.snapshot()
             err = math.dist((tx, ty, pose["z"]), (reached["x"], reached["y"], reached["z"]))
@@ -201,6 +206,8 @@ class Jogger:
         else:
             return f"unknown key {key!r}"
 
+        if self.stops != gen:
+            return "stopped before moving"
         await self.arm.move_to_position(Pose(**target))
         reached, joints, g = await self.snapshot()
         err = math.dist((target["x"], target["y"], target["z"]), (reached["x"], reached["y"], reached["z"]))
