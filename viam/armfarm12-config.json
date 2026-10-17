@@ -1,0 +1,213 @@
+{
+  "modules": [
+    {
+      "module_id": "hackathons:7f59678e-79d9-4f87-b9b3-038a8bc2a0f2",
+      "type": "registry",
+      "name": "hackathons_7f59678e-79d9-4f87-b9b3-038a8bc2a0f2",
+      "version": "latest"
+    },
+    {
+      "module_id": "viam-labs:YOLOv8",
+      "type": "registry",
+      "name": "viam-labs_YOLOv8",
+      "version": "latest"
+    },
+    {
+      "module_id": "viam:tflite_cpu",
+      "type": "registry",
+      "name": "viam_tflite_cpu",
+      "version": "latest"
+    }
+  ],
+  "services": [
+    {
+      "name": "flower_color_detector-cyan",
+      "api": "rdk:service:vision",
+      "model": "rdk:builtin:color_detector",
+      "attributes": {
+        "detect_color": "#16d4d1",
+        "hue_tolerance_pct": 0.075
+      }
+    },
+    {
+      "name": "multicolor_detector",
+      "api": "rdk:service:generic",
+      "model": "hackathons:7f59678e-79d9-4f87-b9b3-038a8bc2a0f2:generic-service",
+      "attributes": {
+        "vision": "flower_color_detector",
+        "gripper": "gripper",
+        "arm": "arm",
+        "genericcomponent": "vase",
+        "camera": "cam"
+      }
+    },
+    {
+      "name": "flower_color_detector-orange",
+      "api": "rdk:service:vision",
+      "model": "rdk:builtin:color_detector",
+      "attributes": {
+        "detect_color": "#b20101",
+        "hue_tolerance_pct": 0.025
+      }
+    },
+    {
+      "name": "yolo8-rose-detection",
+      "api": "rdk:service:vision",
+      "model": "viam-labs:vision:yolov8",
+      "attributes": {
+        "camera_name": "cam",
+        "model_location": "yolov8n.pt"
+      }
+    },
+    {
+      "name": "rose_logger",
+      "api": "rdk:service:data_manager",
+      "model": "rdk:builtin:builtin",
+      "attributes": {
+        "tags": [],
+        "sync_interval_mins": 0.1,
+        "capture_dir": "",
+        "additional_sync_paths": []
+      }
+    },
+    {
+      "api": "rdk:service:mlmodel",
+      "attributes": {
+        "label_path": "${packages.ml_model.rose-detector}/labels.txt",
+        "package_reference": "6d6c7293-bc67-43e4-9c8b-31c76aac27d3/rose-detector",
+        "model_path": "${packages.ml_model.rose-detector}/rose-detector.tflite"
+      },
+      "model": "viam:mlmodel-tflite:tflite_cpu",
+      "name": "rose-model"
+    },
+    {
+      "api": "rdk:service:vision",
+      "attributes": {
+        "camera_name": "cam",
+        "mlmodel_name": "rose-model",
+        "default_minimum_confidence": 0.5
+      },
+      "model": "rdk:builtin:mlmodel",
+      "name": "vision-1"
+    }
+  ],
+  "components": [
+    {
+      "api": "rdk:component:generic",
+      "frame": {
+        "orientation": {
+          "type": "ov_degrees",
+          "value": {
+            "y": 0.0,
+            "z": 1.0,
+            "th": 0.0,
+            "x": 0.0
+          }
+        },
+        "parent": "world",
+        "translation": {
+          "y": 233.5410258335763,
+          "z": 118.27182592059745,
+          "x": 359.8258090218256
+        }
+      },
+      "attributes": {
+        "geometries": [
+          {
+            "y": 100.0,
+            "z": 248.073238715028,
+            "type": "box",
+            "label": "shape",
+            "x": 151.7684749761952
+          }
+        ]
+      },
+      "name": "vase",
+      "model": "rdk:builtin:obstacle",
+      "visualizer": {
+        "opacity": 1.0,
+        "type": "simple"
+      }
+    }
+  ],
+  "packages": [
+    {
+      "name": "rose-detector",
+      "package": "6d6c7293-bc67-43e4-9c8b-31c76aac27d3/rose-detector",
+      "type": "ml_model",
+      "version": "latest"
+    }
+  ],
+  "fragments": [
+    {
+      "variables": {
+        "base-axis-rotation-degrees": 0.0,
+        "cam-serial-number": "<redacted>",
+        "arm-name": "arm",
+        "arm-ip-address": "<redacted: venue LAN IP>",
+        "translation": {
+          "y": 0.0,
+          "z": 0.0,
+          "x": 0.0
+        }
+      },
+      "id": "859f2598-60f1-43a2-8df2-13ffbee949cc"
+    },
+    {
+      "variables": {
+        "front-wall-translation": {
+          "y": 0.0,
+          "z": 300.0,
+          "x": 740.0
+        },
+        "ceiling-translation": {
+          "y": 0.0,
+          "z": 1050.0,
+          "x": 0.0
+        },
+        "table-translation": {
+          "y": 0.0,
+          "z": -123.0,
+          "x": 0.0
+        },
+        "side-wall-translation": {
+          "y": -500.0,
+          "z": 300.0,
+          "x": 0.0
+        }
+      },
+      "id": "01ca42e4-78b9-425c-ae75-1101b9a7f3e8"
+    }
+  ],
+  "fragment_mods": [
+    {
+      "mods": [
+        {
+          "$set": {
+            "components.cam.service_configs": [
+              {
+                "type": "data_manager",
+                "attributes": {
+                  "capture_methods": [
+                    {
+                      "method": "GetImages",
+                      "capture_frequency_hz": 0.5,
+                      "disabled": true,
+                      "additional_params": {}
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$set": {
+            "components.arm.attributes.ufactory-studio-proxy": true
+          }
+        }
+      ],
+      "fragment_id": "859f2598-60f1-43a2-8df2-13ffbee949cc"
+    }
+  ]
+}
