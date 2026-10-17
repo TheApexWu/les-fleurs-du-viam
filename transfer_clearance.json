@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "verified": false,
+  "pickup_clearance_z_mm": 174.98194767009213,
+  "vase_retreat_xy_mm": [0.0, 50.0],
+  "note": "Requested 50 mm: rotation height is 50 mm above the original taught lift; retreat is 50 mm along world +Y, toward scan and away from the vase. Verify this new route onsite before setting verified true."
+}

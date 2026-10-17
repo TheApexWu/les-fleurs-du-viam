@@ -12,7 +12,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from ultralytics import YOLO
 
 WEIGHTS = Path(__file__).parent / "weights" / "flowers.pt"
 _model = None
@@ -36,12 +35,15 @@ def colour_of(bgr_crop, variety):
         "yellow": np.mean((h >= 20) & (h <= 34) & (s > 40)),
     }
     frac["red-white"] = frac["red"] if frac["red"] > 0.03 else 0.0  # carnation stripes: some red among white
-    frac["white"] = 0.05 if frac["red"] <= 0.03 else 0.0
+    frac["white"] = float(np.mean((s < 50) & (v > 140))) if frac["red"] <= 0.03 else 0.0
     allowed = STOCK.get(variety, tuple(frac))
-    return max(allowed, key=lambda c: frac.get(c, 0.0))
+    color = max(allowed, key=lambda c: frac.get(c, 0.0))
+    return color if frac.get(color, 0.0) >= 0.03 else "unknown"
 
 
 def detect(bgr, conf=0.3):
+    from ultralytics import YOLO
+
     global _model
     _model = _model or YOLO(str(WEIGHTS))
     r = _model.predict(bgr, conf=conf, iou=0.4, agnostic_nms=True, verbose=False)[0]

@@ -4,6 +4,8 @@
   python flowers.py plan_check x y z           check reachability without moving
   python flowers.py pretend_loop               move through the saved flowerless path
   python flowers.py pick_and_drop              grasp one stem and release it at the vase
+  python flowers.py pick_and_drop_axis y MM    shift the three pickup poses by a measured Y offset
+  python flowers.py restore_scan               return to the saved vision scan pose with planning checks
   python flowers.py grip_calibrate             check semantic Grab on one stem
   python flowers.py photo                      move to the taught photo pose and ask the critic
 
@@ -65,8 +67,8 @@ POSE_FIELDS = ("x", "y", "z", "o_x", "o_y", "o_z", "theta")
 
 def saved_pose(data: dict, name: str) -> G.P:
     """Return a validated world-frame pose saved by the live Viam pose capture workflow."""
-    if name not in PRETEND_POSE_NAMES:
-        raise ValueError(f"{name!r} is not a captured pretend-loop pose")
+    if name not in (*PRETEND_POSE_NAMES, "post_pick_return"):
+        raise ValueError(f"{name!r} is not a captured pickup/drop or return pose")
     raw = data.get(name)
     if not isinstance(raw, dict):
         raise ValueError(f"missing {name!r} in {K.TAUGHT}; capture it before moving")
@@ -80,6 +82,44 @@ def saved_pose(data: dict, name: str) -> G.P:
             raise ValueError(f"{name!r}.{field} must be a finite number")
         values[field] = float(value)
     return G.P(**values)
+
+
+def transfer_clearance(data=None):
+    """Read operator-verified clearances; never substitute guessed distances."""
+    data = K.taught() if data is None else data
+    if not K.TRANSFER_CLEARANCE.exists():
+        raise ValueError("Record the pickup rotation height and vase withdrawal in transfer_clearance.json first.")
+    clearance = json.loads(K.TRANSFER_CLEARANCE.read_text())
+    height, retreat = clearance.get("pickup_clearance_z_mm"), clearance.get("vase_retreat_xy_mm")
+    finite = lambda n: isinstance(n, (int, float)) and not isinstance(n, bool) and math.isfinite(n)
+    if not finite(height) or height <= max(data[name]["z"] for name in ("pretend_grasp", "lift")):
+        raise ValueError("Pickup clearance must be a measured world Z above the grasp and original lift.")
+    if (not isinstance(retreat, list) or len(retreat) != 2 or not all(finite(n) for n in retreat)
+            or math.hypot(*retreat) < K.MIN_CLEARANCE_MM):
+        raise ValueError("Vase withdrawal needs a measured horizontal [delta_X, delta_Y] of at least 15 mm.")
+    if clearance.get("verified") is not True:
+        raise ValueError("The new rotation height and horizontal vase withdrawal need onsite verification.")
+    if not K.PLAN_CHECK:
+        raise RuntimeError("Clearance transfers require collision plan checks.")
+    return clearance
+
+
+def clearance_waypoints(data):
+    """Keep pickup/release orientations fixed until clear of flowers and ground."""
+    settings = transfer_clearance(data)
+    grasp, lift, release = (saved_pose(data, n) for n in ("pretend_grasp", "lift", "pretend_release"))
+    fields = lambda p: {field: getattr(p, field) for field in POSE_FIELDS}
+    height = settings["pickup_clearance_z_mm"]
+    up = fields(grasp)
+    up["z"] = height
+    high_lift = fields(lift)
+    high_lift["z"] = height
+    away = fields(release)
+    away["x"] += settings["vase_retreat_xy_mm"][0]
+    away["y"] += settings["vase_retreat_xy_mm"][1]
+    away_up = dict(away, z=max(height, data["vase_approach"]["z"]))
+    return {"pickup_clearance": G.P(**up), "high_lift": G.P(**high_lift),
+            "vase_withdraw": G.P(**away), "vase_withdraw_up": G.P(**away_up)}
 
 
 class FlowerBot:
@@ -99,14 +139,16 @@ class FlowerBot:
     async def gripper_width(self) -> float:
         return (await self.arm.do_command({"get_gripper": True}))["gripper_position"]
 
-    async def plan(self, destination: PoseInFrame, world_state=None) -> dict:
+    async def plan(self, destination: PoseInFrame, world_state=None, constraints=None) -> dict:
         """Plan without moving (builtin motion DoCommand "plan", rdk v1.12.0). Raises if there is no full plan
         or the planner hasn't answered within PLAN_TIMEOUT_S (it searched >200 s for some poses on 16 Oct)."""
         req = MoveRequest(name=K.MOTION, component_name=K.GRIPPER, destination=destination,
-                          world_state=world_state)
+                          world_state=world_state, constraints=constraints)
         res = await self.motion.do_command({"plan": json_format.MessageToJson(req)}, timeout=K.PLAN_TIMEOUT_S)
         if "plan_partialwp" in res:
             raise RuntimeError(f"plan only reaches waypoint {res['plan_partialwp']}")
+        if not isinstance(res.get("plan"), list) or len(res["plan"]) < 2:
+            raise RuntimeError("motion planner did not return a complete path")
         return res
 
     async def wait_gripper_idle(self, timeout_s: float = 8.0):
@@ -166,7 +208,8 @@ class FlowerBot:
         return WorldState(obstacles=geoms)
 
     async def move(self, p, straight=False):
-        constraints = (Constraints(linear_constraint=[LinearConstraint(line_tolerance_mm=2.0)])
+        constraints = (Constraints(linear_constraint=[LinearConstraint(
+            line_tolerance_mm=2.0, orientation_tolerance_degs=1.0)])
                        if straight else None)
         world_state = self.obstacles()
         # With no temporary stem obstacles, omit WorldState so Viam continues to plan
@@ -175,10 +218,13 @@ class FlowerBot:
             world_state = None
         destination = PoseInFrame(reference_frame="world", pose=pose(p))
         if K.PLAN_CHECK:
-            await self.plan(destination, world_state=world_state)
-        return await self.motion.move(component_name=K.GRIPPER,
-                                      destination=destination,
-                                      world_state=world_state, constraints=constraints)
+            await self.plan(destination, world_state=world_state, constraints=constraints)
+        moved = await self.motion.move(component_name=K.GRIPPER,
+                                       destination=destination,
+                                       world_state=world_state, constraints=constraints)
+        if not moved:
+            raise RuntimeError("motion service did not confirm reaching the requested pose")
+        return moved
 
     # ── steps ──────────────────────────────────────────────────────────────
     async def resources(self):
@@ -314,6 +360,19 @@ class FlowerBot:
         print(f"moving slowly to {name}")
         await self.move(target)
 
+    async def restore_scan(self):
+        """Explicit planned return to the saved vision view; never actuate jaws."""
+        from bouquet_core import validate_pose
+        calibration = json.loads(K.BOUQUET_CALIBRATION.read_text())
+        target = calibration.get("scan_pose")
+        if not validate_pose(target):
+            raise ValueError("The vision calibration has no valid saved scan pose.")
+        if not K.PLAN_CHECK:
+            raise RuntimeError("Returning to the scan pose requires motion plan checks.")
+        await self.speed(fast=False)
+        print("restoring saved vision scan pose with collision planning; gripper will not actuate")
+        await self.move(G.P(**{field: target[field] for field in POSE_FIELDS}))
+
     async def pretend_loop(self):
         """Traverse the captured flowerless path and return to pickup_approach without gripping."""
         data = K.taught()
@@ -326,22 +385,64 @@ class FlowerBot:
             print(f"moving to {name}")
             await self.move(targets[name])
 
-    async def pick_and_drop(self):
+    async def pick_and_drop_axis(self, axis, offset_mm):
+        """Use an operator-verified XY offset; never infer millimeters from pixels.
+
+        All three pickup waypoints shift together. The saved grasp height,
+        orientations, vase path, gripper checks and post-pick return stay shared
+        with the working fixed-pose routine.
+        """
+        if axis not in ("x", "y"):
+            raise ValueError("Pickup axis must be x or y; the taught Z heights are retained.")
+        offset = float(offset_mm)
+        if not math.isfinite(offset):
+            raise ValueError("Pickup offset must be a finite measured distance in millimeters.")
+        if not K.PLAN_CHECK:
+            raise RuntimeError("Translated pickups require collision plan checks.")
+        data = K.taught()
+        shifted = {}
+        for name in ("pickup_approach", "pretend_grasp", "lift"):
+            original = saved_pose(data, name)
+            shifted[name] = {field: getattr(original, field) for field in POSE_FIELDS}
+            shifted[name][axis] += offset
+        print(f"taught pickup translation: {axis.upper()} {offset:+.3f} mm; "
+              "use only an onsite-verified offset, not an unverified camera estimate")
+        await self.pick_and_drop(pickup_poses=shifted)
+
+    async def pick_and_drop(self, pickup_poses=None, on_stage=None, *, use_taught_return=True):
         """Pick one stem at the taught grasp pose, carry it to the vase, release, and retreat.
 
         The flower must be placed so its stem is between the fingers at pretend_grasp. This
         uses semantic Grab/Open commands and checks the settled aperture. An empty close reads
         nearly zero; Grab's success boolean and the holding sensor alone are not proof of a stem.
+        Fixed-pose runs finish at post_pick_return when captured. The vision
+        controller owns its calibrated scan return and disables this final move.
         """
-        data = K.taught()
+        data = dict(K.taught())
+        if pickup_poses is not None:
+            required = {"pickup_approach", "pretend_grasp", "lift"}
+            if not isinstance(pickup_poses, dict) or set(pickup_poses) != required:
+                raise ValueError("pickup override must contain exactly pickup_approach, pretend_grasp, and lift")
+            data.update(pickup_poses)
         targets = {name: saved_pose(data, name) for name in PRETEND_POSE_NAMES}
+        clear = clearance_waypoints(data)  # Validate the entire new path before actuating anything.
+        return_to_captured = use_taught_return and "post_pick_return" in data
+        return_target = (saved_pose(data, "post_pick_return")
+                         if return_to_captured else targets["pickup_approach"])
+
+        async def stage(name):
+            if on_stage is not None:
+                await on_stage(name)
+
         await self.setup()
         await self.speed(fast=False)
         await self.open_gripper()
         print("pick_and_drop: slow motion; gripper will open, grasp one stem, then release")
 
         await self.move(targets["pickup_approach"])
+        await stage("pickup_approach")
         await self.move(targets["pretend_grasp"])
+        await stage("grasp_position")
         grabbed = await self.grip()
         await self.wait_gripper_idle()
         position = await self.gripper_width()
@@ -354,17 +455,30 @@ class FlowerBot:
             raise RuntimeError("gripper did not confirm a single stem by aperture; "
                                "opened and retreated to pickup_approach")
 
-        await self.move(targets["lift"])
-        await self.move(targets["vase_approach"])
+        await stage("grasped")
+        # A low lift that also changes orientation sweeps long blooms into the
+        # table. Raise vertically with the grasp orientation held fixed first.
+        await self.move(clear["pickup_clearance"], straight=True)
+        await stage("lifted")
+        await self.move(clear["high_lift"], straight=True)
+        await stage("rotation_clearance")
+        await self.move(targets["vase_approach"], straight=True)
         await self.move(targets["pretend_release"])
         # Open fully only after reaching the final release pose; holding feedback is advisory.
         await self.open_gripper()
+        await stage("released")
         status = await self.gripper.is_holding_something()
         print(f"holding sensor after full-open (advisory): {status.is_holding_something}; meta: {status.meta}")
 
-        await self.move(targets["vase_approach"])
-        await self.move(targets["lift"])
-        await self.move(targets["pickup_approach"])
+        # Withdraw parallel to the table at the exact release height/orientation.
+        # Rising beside the vase can catch already placed flowers in open jaws.
+        await self.move(clear["vase_withdraw"], straight=True)
+        await stage("vase_withdrawn")
+        await self.move(clear["vase_withdraw_up"], straight=True)
+        await stage("vase_cleared")
+        if use_taught_return:
+            await self.move(return_target if return_to_captured else clear["high_lift"])
+        await stage("returned" if use_taught_return else "transfer_cleared")
 
     async def place(self, pl: C.Placement, stem_height_mm=250.0):
         ken = K.taught()["kenzan"]
@@ -400,8 +514,8 @@ class FlowerBot:
 
 STEPS = {name: getattr(FlowerBot, name) for name in
          ("resources", "teach", "plan_check", "open_gripper", "grip_test", "grip_calibrate", "pick", "go_hub", "move_pose",
-          "pretend_loop", "pick_and_drop", "vase_one", "fill",
-          "insert_one", "sogetsu", "photo", "say")}
+          "restore_scan", "pretend_loop", "pick_and_drop", "pick_and_drop_axis", "vase_one", "fill",
+          "insert_one", "sogetsu", "photo")}
 
 
 async def main(verb="resources", *args):

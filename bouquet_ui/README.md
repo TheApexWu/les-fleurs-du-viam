@@ -1,11 +1,26 @@
 # Bouquet studio UI
 
+Live inventory now supports the merged vision classifier's variety/color pairs.
+Rows carry `key` (for example `rose:yellow`), `variety`, `color`, `label`,
+`detected_count` and `available` (localized, ready-to-pick count). Order items may
+include `variety`; omitting it means `rose`. Counts for yellow roses and yellow
+lilies are separate. Classification and stem localization use the same image.
+
 For local setup and the next agent's starting instructions, read
-[FRONTEND_HANDOFF.md](../FRONTEND_HANDOFF.md). On this frontend-only branch,
+[FRONTEND_HANDOFF.md](../FRONTEND_HANDOFF.md). For a standalone preview,
 run `python3 bouquet_ui/preview.py` from the repository root and open
 <http://127.0.0.1:8000/?demo=1>. Python's standard library is sufficient.
 
-## Integrated mode (requires the separate bouquet backend)
+## Integrated mode
+
+For a physical three-slot staged demonstration, use
+[`STAGED_DEMO.md`](../STAGED_DEMO.md). After onsite teaching/verification, start
+`python bouquet.py serve --staged-demo staged_demo.json --allow-motion`.
+The same payload, plan, Build, polling and Stop controls are used. This mode is
+visibly labeled as physical; variety/color labels come from operator-staged
+slots and camera checks confirm their tape marks. It never converts blossom
+pixels into grasp coordinates. Reset the slots before each Build. Source
+verification and fresh per-pick scans remain mandatory.
 
 The backend serves `index.html` at `/` and this folder's assets at `/static/`.
 Open the server address to use live inventory. Add `?demo=1` for an explicitly
@@ -25,6 +40,13 @@ backend API so planning, order polling, and error handling can be tested togethe
 The frontend does not estimate positions, interpret classifier scores, or send
 component-level motion commands. Inventory counts come only from the server;
 connection failures replace stale counts with unknown values.
+The API-backed `--demo` provides two of each supported variety/color and runs
+mixed selections through the existing sequential order runner. Dashed bloom
+boxes labeled **head only** preserve the YOLO display; only independent stem
+candidates can carry grasp previews. Use `FLOWERS_CLASSIFIER=viam` with
+`FLOWERS_FLOWER_VISION=flower-detector` to select the deployed Viam variety
+detector, or `FLOWERS_CLASSIFIER=local` for the existing local YOLO classifier.
+Neither mode uses in-chat vision at runtime; both retain calibration gates.
 When provided, numbered camera boxes, grasp pixels, and table grasp coordinates
 show the localization preview. Camera-to-table calibration and a verified grasp
 reference are required before physical picking anywhere on the table.

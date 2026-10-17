@@ -16,7 +16,8 @@ Viam hackathon, 16-17 Oct 2026, robot `armfarm12` (xArm, wrist camera, gripper).
 - Every planned move is dry-run first (`plan_check`). Over the vase the gripper reaches z 600 at most, so roses need a side grasp.
 - `replay.py` plays back the moments marked with M in a teleop session. **Not run on the arm yet.**
 - The semantic gripper calibration succeeded on one stem: reported aperture 45 and holding sensor true. Confirm a stem visually; the sensor is advisory.
-- The five saved waypoints in `taught_poses.json` support `pretend_loop` and the supervised one-stem `pick_and_drop`; see [GRIPPER_MANUAL.md](GRIPPER_MANUAL.md). The full physical flower transfer still needs a supervised run.
+- The five saved waypoints in `taught_poses.json` support the working fixed-location `pretend_loop` and one-stem `pick_and_drop`; see [GRIPPER_MANUAL.md](GRIPPER_MANUAL.md).
+- The next phase adds a bouquet selector and read-only free-table vision preview; see [VISION_BOUQUET.md](VISION_BOUQUET.md). Run `python3 bouquet.py serve --demo` to try the UI. Physical vision pickup still requires on-site camera/table/grasp calibration.
 
 Next:
 1. Reconcile the vase position: our measurement (300, -283, rim z 420) vs the team's config (360, 234, top ~242).
@@ -62,6 +63,8 @@ Turn it off with `PLAN_CHECK = False` in `config.py`.
 | File | What it does |
 |---|---|
 | `flowers.py` | Planner steps: `resources`, `teach`, `plan_check`, `photo` |
+| `bouquet.py`, `bouquet_ui/` | Bouquet color/quantity selector, read-only inventory and order API |
+| `bouquet_vision.py`, `bouquet_localization.py` | Trained stem detections, blossom pairing and measured table localization |
 | `replay.py` | Plays back the marked moments of a teleop session |
 | `config.py` | Names, gripper width, wrist angle, the measured vase |
 | `ai.py` | Blind critic: photo to a guessed feeling |
