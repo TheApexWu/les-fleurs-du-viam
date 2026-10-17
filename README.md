@@ -37,7 +37,7 @@ python dashboard.py      # then open http://localhost:8765  (camera, pose, jog b
 python teleop.py         # same thing in the terminal
 ```
 Exit manual mode first, one person at the stop button. Keys: W/S x, A/D y, R/F z, Q/E wrist spin,
-O/C gripper step, G gentle hold, Tab 20/5 mm steps, M mark a moment, Space STOP.
+O/C gripper step, G grab (gripper default), Tab 20/5 mm steps, M mark a moment, Space STOP.
 Every session writes `recordings/teleop-<time>.jsonl` (each command, the pose reached, error in mm, marks)
 and `recordings/teleop-<time>-trace.csv` (position, joints, gripper ~5x/s, also mid-move).
 Limits refuse moves into the table, walls, ceiling, or fingers into the vase. Nothing else is avoided.

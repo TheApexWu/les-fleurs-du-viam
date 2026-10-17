@@ -22,10 +22,11 @@ MAX_HOLD_STEPS = 40  # a hold that never sees its keyup still ends  # no heartbe
 async def build_app():
     from viam.components.arm import Arm
     from viam.components.camera import Camera
+    from viam.components.gripper import Gripper
     from flowers import connect
 
     robot = await connect()
-    jog = Jogger(Arm.from_robot(robot, K.ARM))
+    jog = Jogger(Arm.from_robot(robot, K.ARM), Gripper.from_robot(robot, K.GRIPPER))
     cam = Camera.from_robot(robot, K.CAMERA)
     await jog.start()
     lines: list[str] = []
@@ -145,7 +146,7 @@ button:hover{border-color:var(--acc)} button.on{border-color:var(--acc);color:va
    <button onmousedown="hs('q')" onmouseup="he('q')" onmouseleave="he('q')" ontouchstart="hs('q')" ontouchend="he('q')">Q spin-</button><button onmousedown="hs('w')" onmouseup="he('w')" onmouseleave="he('w')" ontouchstart="hs('w')" ontouchend="he('w')">W x+</button><button onmousedown="hs('e')" onmouseup="he('e')" onmouseleave="he('e')" ontouchstart="hs('e')" ontouchend="he('e')">E spin+</button>
    <button onmousedown="hs('a')" onmouseup="he('a')" onmouseleave="he('a')" ontouchstart="hs('a')" ontouchend="he('a')">A y+</button><button onmousedown="hs('s')" onmouseup="he('s')" onmouseleave="he('s')" ontouchstart="hs('s')" ontouchend="he('s')">S x-</button><button onmousedown="hs('d')" onmouseup="he('d')" onmouseleave="he('d')" ontouchstart="hs('d')" ontouchend="he('d')">D y-</button>
    <button onmousedown="hs('r')" onmouseup="he('r')" onmouseleave="he('r')" ontouchstart="hs('r')" ontouchend="he('r')">R z+</button><button onclick="k('\\t')">Tab step</button><button onmousedown="hs('f')" onmouseup="he('f')" onmouseleave="he('f')" ontouchstart="hs('f')" ontouchend="he('f')">F z-</button>
-   <button onmousedown="hs('o')" onmouseup="he('o')" onmouseleave="he('o')" ontouchstart="hs('o')" ontouchend="he('o')">O open</button><button onclick="k('g')">G gentle</button><button onmousedown="hs('c')" onmouseup="he('c')" onmouseleave="he('c')" ontouchstart="hs('c')" ontouchend="he('c')">C close</button>
+   <button onmousedown="hs('o')" onmouseup="he('o')" onmouseleave="he('o')" ontouchstart="hs('o')" ontouchend="he('o')">O open</button><button onclick="k('g')">G grab</button><button onmousedown="hs('c')" onmouseup="he('c')" onmouseleave="he('c')" ontouchstart="hs('c')" ontouchend="he('c')">C close</button>
    <button onmousedown="hs('j')" onmouseup="he('j')" onmouseleave="he('j')" ontouchstart="hs('j')" ontouchend="he('j')">J base +y</button><span></span><button onmousedown="hs('l')" onmouseup="he('l')" onmouseleave="he('l')" ontouchstart="hs('l')" ontouchend="he('l')">L base -y</button>
   </div>
   <button onclick="mark()" style="width:100%">M mark this moment</button>
