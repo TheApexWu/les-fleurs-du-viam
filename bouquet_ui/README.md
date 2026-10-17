@@ -34,7 +34,9 @@ reference are required before physical picking anywhere on the table.
 - `GET /api/inventory` and `POST /api/scan`: `{mode, colors, ready, blockers,
   detected_at?, camera_url?, raw_detection_count?, execution_enabled?}`. Each color is `{color, label, available,
   confidence?}`. `available` is a nonnegative integer or `null` when unknown.
-- `POST /api/plan`: request `{items: [{color, quantity}], rules:
+  Each color entry may also carry `variety` (`rose`, `carnation`, `lily`); without it the UI assumes `rose`.
+  The UI keys stems by `variety:color` (e.g. `carnation:red-white`), so the same colour can exist in two varieties.
+- `POST /api/plan`: request `{items: [{variety, color, quantity}], rules:
   {selection: "highest_confidence" | "left_to_right"}}`; response
   `{ready, blockers, requested_total, assignments, inventory?}`.
 - `POST /api/orders`: same request; response `{id, status, requested_total,
