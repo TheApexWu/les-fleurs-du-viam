@@ -1,0 +1,488 @@
+/* A deliberately small client: the server owns vision, planning, and all motion. */
+(() => {
+  'use strict';
+
+  const demo = new URLSearchParams(window.location.search).get('demo') === '1';
+  const MAX_ORDER_SIZE = 12;
+  const $ = (id) => document.getElementById(id);
+  const palette = {
+    red: { label: 'Red roses', swatch: '#a34c58', background: '#f1e6e3', light: '#e0a2a7' },
+    pink: { label: 'Pink roses', swatch: '#d5969a', background: '#f3eae4', light: '#f9d6cd' },
+    white: { label: 'White roses', swatch: '#e8e3ce', background: '#f0f0e5', light: '#fffdf3' },
+    yellow: { label: 'Yellow roses', swatch: '#d5b66b', background: '#f3eedc', light: '#f8e8aa' },
+    orange: { label: 'Orange roses', swatch: '#cf8b63', background: '#f3e7dc', light: '#f4c29d' },
+    cyan: { label: 'Cyan roses', swatch: '#6faaa7', background: '#e6efea', light: '#bbdfd4' },
+    purple: { label: 'Purple roses', swatch: '#967496', background: '#eee7ed', light: '#d6b8d4' },
+  };
+  const state = {
+    colors: ['red', 'pink', 'white', 'yellow'].map((color) => ({ color, label: palette[color].label, available: null })),
+    quantities: {}, inventory: null, plan: null, order: null, busy: false, scanning: false,
+    connected: false, pollFailures: 0, demoTimer: null,
+  };
+
+  function textElement(tag, text, className) {
+    const node = document.createElement(tag);
+    node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
+
+  function styleFor(color) {
+    return palette[String(color).toLowerCase()] || { label: String(color), swatch: '#927e90', background: '#eee9e8', light: '#d9c6d3' };
+  }
+
+  function roseArt(color) {
+    const theme = styleFor(color);
+    // Only controlled palette values enter SVG markup; resource labels use textContent.
+    return `<svg viewBox="0 0 110 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M53 109C54 88 53 66 56 41" stroke="#638164" stroke-width="2" stroke-linecap="round"/><path d="M54 86C39 89 29 80 28 71C42 70 51 76 54 86Z" fill="#7c9472"/><path d="M54 74C65 76 76 70 79 60C66 57 57 65 54 74Z" fill="#6f8d67"/><path d="M55 47C37 45 24 29 31 18C35 9 45 11 48 17C47 0 64-1 70 11C78 8 86 16 81 25C91 38 73 53 61 53Z" fill="${theme.swatch}" stroke="#0000000b"/><path d="M36 18C31 31 47 45 60 46C49 38 45 28 51 20C58 11 68 15 68 23C62 29 58 32 53 34M49 44C62 49 77 40 77 31M48 16C49 23 49 31 53 34C61 35 72 27 68 23M53 34C53 40 56 43 60 46" stroke="${theme.light}" stroke-opacity=".8" stroke-width="1.1" stroke-linecap="round"/></svg>`;
+  }
+
+  function total() {
+    return Object.values(state.quantities).reduce((sum, quantity) => sum + quantity, 0);
+  }
+
+  function isDemo() {
+    return demo || state.inventory?.mode === 'demo';
+  }
+
+  function activeOrder() {
+    return state.order && ['pending', 'queued', 'running', 'planning', 'picking', 'placing', 'stopping'].includes(state.order.status);
+  }
+
+  function announce(message) {
+    $('announcer').textContent = message;
+  }
+
+  function notice(message, info = false) {
+    const node = $('global-notice');
+    node.textContent = message || '';
+    node.className = info ? 'notice info' : 'notice';
+    node.hidden = !message;
+  }
+
+  function setConnection(mode, label) {
+    $('connection-pill').className = `connection-pill ${mode}`;
+    $('connection-label').textContent = label;
+  }
+
+  function payload() {
+    return {
+      items: state.colors.filter((item) => state.quantities[item.color] > 0).map((item) => ({ color: item.color, quantity: state.quantities[item.color] })),
+      rules: { selection: $('selection-rule').value },
+    };
+  }
+
+  async function api(path, options = {}) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(path, {
+        ...options,
+        headers: { 'Accept': 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}) },
+        signal: controller.signal,
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) throw new Error(`The server did not return JSON (${response.status}). Start the bouquet server and open its address.`);
+      const data = await response.json();
+      if (!response.ok) {
+        const detail = typeof data.error === 'string' ? data.error : (data.message || `Request failed (${response.status})`);
+        const blockers = Array.isArray(data.blockers) ? data.blockers.map(blockerText) : [];
+        throw new Error([detail, ...blockers].join(' '));
+      }
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('The request timed out. Check the robot connection before trying again.');
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function renderFlowers() {
+    const grid = $('flower-grid');
+    const focus = document.activeElement?.dataset?.control;
+    grid.replaceChildren();
+    for (const item of state.colors) {
+      const quantity = state.quantities[item.color] || 0;
+      const theme = styleFor(item.color);
+      const label = item.label || theme.label;
+      const card = textElement('article', '', `flower-card${quantity ? ' selected' : ''}`);
+      card.style.setProperty('--flower-bg', theme.background);
+      const picture = textElement('div', '', 'flower-picture');
+      picture.innerHTML = roseArt(item.color);
+      picture.append(textElement('span', '✓', 'card-picked'));
+      const body = textElement('div', '', 'flower-card-body');
+      body.append(textElement('h3', label));
+      body.append(textElement('p', Number.isInteger(item.available) ? `${item.available} available in view` : 'Inventory not scanned', 'available-label'));
+      const controls = textElement('div', '', 'quantity-control');
+      for (const [delta, symbol, action] of [[-1, '−', 'Remove'], [1, '+', 'Add']]) {
+        if (delta === 1) {
+          const count = textElement('output', String(quantity));
+          count.setAttribute('aria-label', `${label} quantity`);
+          controls.append(count);
+        }
+        const button = textElement('button', symbol);
+        button.type = 'button';
+        button.setAttribute('aria-label', `${action} one ${label.toLowerCase().replace(/roses$/, 'rose')}`);
+        button.dataset.control = `${item.color}:${delta}`;
+        button.disabled = !!activeOrder() || state.busy || (delta < 0 ? quantity === 0 : total() >= MAX_ORDER_SIZE);
+        button.addEventListener('click', () => {
+          state.quantities[item.color] = Math.max(0, quantity + delta);
+          invalidatePlan();
+          render();
+          announce(`${state.quantities[item.color]} ${label.toLowerCase()} selected. ${total()} stems total.`);
+        });
+        controls.append(button);
+      }
+      body.append(controls);
+      card.append(picture, body);
+      grid.append(card);
+    }
+    if (focus) Array.from(grid.querySelectorAll('button')).find((button) => button.dataset.control === focus && !button.disabled)?.focus({ preventScroll: true });
+  }
+
+  function invalidatePlan() {
+    state.plan = null;
+    $('plan-result').hidden = true;
+  }
+
+  function renderSummary() {
+    const count = total();
+    $('stem-total').textContent = count;
+    $('stem-unit').textContent = count === 1 ? 'stem' : 'stems';
+    const list = $('summary-items');
+    list.replaceChildren();
+    for (const item of state.colors.filter((item) => state.quantities[item.color] > 0)) {
+      const row = textElement('div', '', 'summary-row');
+      const dot = textElement('span', '', 'color-dot');
+      dot.style.setProperty('--swatch', styleFor(item.color).swatch);
+      row.append(dot, textElement('span', item.label || styleFor(item.color).label), textElement('span', `× ${state.quantities[item.color]}`, 'summary-quantity'));
+      list.append(row);
+    }
+    if (!count) list.append(textElement('p', 'Something lovely starts with one rose.', 'empty-summary'));
+    const running = !!activeOrder();
+    $('clear-selection').disabled = running || state.busy || !count;
+    $('selection-rule').disabled = running || state.busy;
+    $('plan-button').disabled = !count || state.busy || state.scanning || running || (!demo && !state.connected);
+    $('build-button').disabled = !count || state.busy || state.scanning || running || !state.plan?.ready;
+    $('build-button').firstChild.textContent = isDemo() ? 'Preview arrangement ' : (running ? 'Arranging your bouquet ' : 'Build my bouquet ');
+    $('scan-button').disabled = state.scanning || state.busy || running;
+    $('scan-button').classList.toggle('loading', state.scanning);
+    $('scan-button').setAttribute('aria-busy', String(state.scanning));
+    $('build-caption').textContent = isDemo() ? 'Preview only. The robot will not move.' : (running ? 'The arm is working. Keep the workbench clear.' : state.plan?.ready ? 'Ready to arrange. The arm will move when you build.' : 'Choose your stems, then check the bouquet.');
+  }
+
+  function renderInventory() {
+    const list = $('inventory-list');
+    list.replaceChildren();
+    for (const item of state.colors) {
+      const row = textElement('div', '', 'inventory-row');
+      const dot = textElement('span', '', 'color-dot');
+      dot.style.setProperty('--swatch', styleFor(item.color).swatch);
+      row.append(dot, textElement('span', item.label || styleFor(item.color).label));
+      row.append(textElement('span', Number.isInteger(item.available) ? `${item.available} stems` : '—', 'inventory-count'));
+      list.append(row);
+    }
+    const mode = isDemo() ? 'demo' : (state.connected && state.inventory?.mode === 'live' ? 'live' : 'offline');
+    $('inventory-dot').className = `status-dot ${mode}`;
+    $('inventory-status-text').textContent = isDemo() ? 'Sample inventory · preview only' : state.scanning ? 'Looking for roses…' : mode === 'live' ? 'Live vision connected' : 'Live inventory unavailable';
+    const blockers = state.inventory?.blockers || [];
+    const detectionCount = state.inventory?.raw_detection_count;
+    const needsCalibration = !isDemo() && state.inventory && (!state.inventory.ready || blockers.length > 0);
+    $('calibration-notice').hidden = !needsCalibration;
+    $('calibration-title').textContent = 'Camera-to-table calibration needed';
+    $('calibration-blockers').replaceChildren(...blockers.map((blocker) => textElement('li', blockerText(blocker))));
+    if (needsCalibration && !blockers.length) $('calibration-blockers').append(textElement('li', 'Camera-to-table calibration and the grasp reference must be verified before an order can start.'));
+    $('detection-evidence').hidden = !Number.isInteger(detectionCount);
+    $('detection-evidence').textContent = Number.isInteger(detectionCount) ? `${detectionCount} raw stem detection${detectionCount === 1 ? '' : 's'} · color and pick locations still need verification.` : '';
+    const detectedAt = state.inventory?.detected_at;
+    const date = detectedAt ? new Date(typeof detectedAt === 'number' ? (detectedAt < 1e12 ? detectedAt * 1000 : detectedAt) : detectedAt) : null;
+    $('inventory-time').textContent = date && !Number.isNaN(date.getTime()) ? `Last scan ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · checked again before building` : 'Inventory is checked again before an order starts.';
+    const cameraUrl = state.inventory?.camera_url;
+    if (typeof cameraUrl === 'string' && /^(\/[^/]|https?:\/\/)/.test(cameraUrl)) {
+      const stamp = detectedAt ? encodeURIComponent(String(detectedAt)) : '';
+      const source = `${cameraUrl}${stamp ? `${cameraUrl.includes('?') ? '&' : '?'}scan=${stamp}` : ''}`;
+      if ($('camera-preview').getAttribute('src') !== source) $('camera-preview').src = source;
+      $('camera-view').hidden = false;
+    } else $('camera-view').hidden = true;
+    renderCandidates();
+    renderCameraOverlay();
+  }
+
+  function renderCandidates() {
+    const candidates = Array.isArray(state.inventory?.candidates) ? state.inventory.candidates : [];
+    const list = $('candidate-list');
+    list.replaceChildren();
+    list.hidden = candidates.length === 0;
+    if (!candidates.length) return;
+    list.append(textElement('p', 'DETECTION PREVIEW', 'candidate-eyebrow'));
+    candidates.slice(0, 6).forEach((candidate, index) => {
+      const card = textElement('div', '', 'candidate-card');
+      const heading = textElement('div', '', 'candidate-heading');
+      const color = candidate.color && candidate.color !== 'unknown' ? candidate.color : 'color unknown';
+      heading.append(textElement('strong', `${index + 1}. ${color}`));
+      const score = Number.isFinite(candidate.confidence) ? `${Math.round(candidate.confidence * 100)}% · ` : '';
+      heading.append(textElement('span', `${score}${candidate.pickable ? 'localized' : 'needs setup'}`));
+      card.append(heading);
+      if (Array.isArray(candidate.grasp_pixel) && candidate.grasp_pixel.length >= 2) card.append(textElement('p', `Grasp pixel: ${candidate.grasp_pixel.slice(0, 2).map((value) => Math.round(value)).join(', ')}`));
+      if (Array.isArray(candidate.world_grasp) && candidate.world_grasp.length >= 3) card.append(textElement('p', `Table grasp: ${candidate.world_grasp.slice(0, 3).map((value) => Number(value).toFixed(1)).join(', ')} mm`));
+      const reasons = (Array.isArray(candidate.blockers) ? candidate.blockers : []).map(blockerText);
+      if (reasons.length) card.append(textElement('p', reasons.join(' · '), 'candidate-blocker'));
+      list.append(card);
+    });
+    if (candidates.length > 6) list.append(textElement('p', `${candidates.length - 6} more detections in the current scan.`, 'muted'));
+  }
+
+  function renderCameraOverlay() {
+    const overlay = $('camera-overlay');
+    overlay.replaceChildren();
+    const size = state.inventory?.image_size;
+    const width = Array.isArray(size) ? Number(size[0]) : $('camera-preview').naturalWidth;
+    const height = Array.isArray(size) ? Number(size[1]) : $('camera-preview').naturalHeight;
+    if (!(width > 0 && height > 0)) return;
+    overlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    const svg = (tag, attributes) => {
+      const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+      return node;
+    };
+    const candidates = Array.isArray(state.inventory?.candidates) ? state.inventory.candidates : [];
+    candidates.forEach((candidate, index) => {
+      const box = candidate.bbox;
+      if (!Array.isArray(box) || box.length !== 4 || !box.every(Number.isFinite)) return;
+      const color = candidate.pickable ? '#b9ed92' : '#ffc579';
+      const stroke = Math.max(2, width / 300);
+      overlay.append(svg('rect', { x: box[0], y: box[1], width: Math.max(0, box[2] - box[0]), height: Math.max(0, box[3] - box[1]), fill: 'none', stroke: color, 'stroke-width': stroke }));
+      const label = svg('text', { x: box[0] + stroke * 2, y: Math.max(20, box[1] - stroke * 2), fill: color, 'font-size': Math.max(20, width / 38), 'font-family': 'sans-serif', 'font-weight': 700, 'paint-order': 'stroke', stroke: '#183e33', 'stroke-width': stroke });
+      label.textContent = String(index + 1);
+      overlay.append(label);
+      const pixel = candidate.grasp_pixel;
+      if (Array.isArray(pixel) && pixel.length >= 2 && pixel.slice(0, 2).every(Number.isFinite)) overlay.append(svg('circle', { cx: pixel[0], cy: pixel[1], r: Math.max(4, width / 120), fill: color, stroke: '#183e33', 'stroke-width': stroke / 2 }));
+    });
+  }
+
+  function render() {
+    renderFlowers();
+    renderSummary();
+    renderInventory();
+  }
+
+  function applyInventory(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.colors)) throw new Error('The inventory response is missing its colors list.');
+    state.inventory = snapshot;
+    // An empty snapshot must not preserve quantities or imply old detections are current.
+    const colors = snapshot.colors.length ? snapshot.colors : ['red', 'pink', 'white', 'yellow'].map((color) => ({ color, label: palette[color].label, available: null }));
+    state.colors = colors.map((item) => ({
+      color: String(item.color),
+      label: String(item.label || styleFor(item.color).label),
+      available: Number.isInteger(item.available) && item.available >= 0 ? item.available : null,
+      confidence: item.confidence,
+    }));
+    state.quantities = Object.fromEntries(state.colors.map((item) => [item.color, state.quantities[item.color] || 0]));
+    state.connected = demo || ['live', 'demo'].includes(snapshot.mode);
+    invalidatePlan();
+    $('demo-banner').hidden = !isDemo();
+    setConnection(isDemo() ? 'demo' : state.connected ? 'live' : 'offline', isDemo() ? 'Preview mode' : state.connected ? 'Vision connected' : 'Robot offline');
+    notice('');
+    render();
+  }
+
+  function blockerText(blocker) {
+    return typeof blocker === 'string' ? blocker : String(blocker?.message || blocker?.reason || JSON.stringify(blocker));
+  }
+
+  function inventoryFailed(error) {
+    state.connected = false;
+    state.inventory = null;
+    state.colors = state.colors.map((item) => ({ ...item, available: null }));
+    invalidatePlan();
+    setConnection('offline', 'Robot offline');
+    notice(`Could not read the live inventory: ${error.message}`);
+    render();
+  }
+
+  async function scan() {
+    if (state.scanning || activeOrder()) return;
+    state.scanning = true;
+    renderSummary();
+    renderInventory();
+    try {
+      if (demo) applyInventory(demoInventory());
+      else applyInventory(await api('/api/scan', { method: 'POST' }));
+      announce('Rose inventory updated.');
+    } catch (error) { inventoryFailed(error); }
+    finally { state.scanning = false; render(); }
+  }
+
+  function showPlan(plan) {
+    const node = $('plan-result');
+    node.replaceChildren();
+    node.hidden = false;
+    node.className = plan.ready ? 'plan-result' : 'plan-result error';
+    if (plan.ready) {
+      node.append(textElement('span', `${plan.requested_total || total()} stems checked. Your bouquet is ready to arrange.`));
+    } else {
+      node.append(textElement('span', 'A little attention before we can build:'));
+      const list = document.createElement('ul');
+      for (const blocker of plan.blockers || ['The planner did not approve this bouquet.']) list.append(textElement('li', blockerText(blocker)));
+      node.append(list);
+    }
+  }
+
+  async function checkPlan() {
+    if (state.busy || !total() || activeOrder()) return;
+    state.busy = true;
+    render();
+    try {
+      const result = demo ? demoPlan() : await api('/api/plan', { method: 'POST', body: JSON.stringify(payload()) });
+      if (typeof result.ready !== 'boolean') throw new Error('The planner response is missing its readiness result.');
+      state.plan = result;
+      showPlan(result);
+      announce(result.ready ? 'Your bouquet is ready to arrange.' : 'Your bouquet needs attention. See the planner message.');
+    } catch (error) {
+      state.plan = null;
+      showPlan({ ready: false, blockers: [error.message] });
+    } finally { state.busy = false; render(); }
+  }
+
+  function renderOrder(order) {
+    state.order = order;
+    const idle = !order || order.status === 'idle';
+    $('progress-panel').hidden = idle;
+    if (idle) { renderSummary(); return; }
+    const requested = Number(order.requested_total) || total();
+    const completed = Math.max(0, Number(order.completed) || 0);
+    const percent = requested ? Math.min(100, Math.round(completed / requested * 100)) : 0;
+    $('progress-count').textContent = `${completed} / ${requested} stems`;
+    $('progress-track').setAttribute('aria-valuenow', String(percent));
+    $('progress-fill').style.width = `${percent}%`;
+    const messages = {
+      pending: 'Checking the workbench and preparing your first rose.', queued: 'Your bouquet is queued.',
+      planning: 'Finding a path to the next stem.', running: 'Picking and placing one stem at a time.',
+      picking: 'Gently picking the next rose.', placing: 'Placing a rose into the vase.',
+      completed: 'Your bouquet is ready. A little beauty, arranged.', complete: 'Your bouquet is ready. A little beauty, arranged.',
+      failed: 'The arrangement stopped. Check the error before continuing.', error: 'The arrangement stopped. Check the error before continuing.',
+      stopped: 'The arm was stopped. Inspect its position before starting another order.', stopping: 'Sending the stop command to the arm.',
+      cancelled: 'The arrangement was cancelled.',
+    };
+    $('progress-title').textContent = ['complete', 'completed'].includes(order.status) ? 'A little beauty, arranged.' : order.status === 'stopped' ? 'A moment to pause.' : 'One rose at a time.';
+    $('progress-message').textContent = order.error ? `${messages[order.status] || 'Order needs attention'} ${blockerText(order.error)}` : (messages[order.status] || `Order status: ${order.status}`);
+    $('progress-verification').hidden = typeof order.verification !== 'string' || !order.verification;
+    $('progress-verification').textContent = typeof order.verification === 'string' ? order.verification : '';
+    const steps = $('order-steps');
+    steps.replaceChildren();
+    for (const step of (Array.isArray(order.steps) ? order.steps : []).slice(-6)) {
+      const message = typeof step === 'string' ? step : step.message || step.label || [step.color, step.stage || step.status].filter(Boolean).join(' · ');
+      if (message) steps.append(textElement('li', String(message)));
+    }
+    renderFlowers();
+    renderSummary();
+  }
+
+  async function buildBouquet() {
+    if (state.busy || activeOrder() || !state.plan?.ready) return;
+    state.busy = true;
+    render();
+    try {
+      if (demo) startDemoOrder();
+      else {
+        const order = await api('/api/orders', { method: 'POST', body: JSON.stringify(payload()) });
+        if (!order.id || !order.status) throw new Error('The server did not confirm an order. Check the arm state before trying again.');
+        renderOrder(order);
+      }
+      announce(isDemo() ? 'Arrangement preview started. No robot commands are sent.' : 'The bouquet order has started.');
+      $('progress-panel').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+    } catch (error) {
+      notice(`Could not start the bouquet: ${error.message}`);
+      invalidatePlan();
+    } finally { state.busy = false; render(); }
+  }
+
+  async function stopArm() {
+    const button = $('stop-button');
+    button.disabled = true;
+    try {
+      if (demo) {
+        window.clearInterval(state.demoTimer);
+        if (activeOrder()) renderOrder({ ...state.order, status: 'stopped' });
+        notice('The arrangement preview has stopped. No robot command was sent.', true);
+      } else {
+        const result = await api('/api/stop', { method: 'POST' });
+        if (state.order && activeOrder()) renderOrder({ ...state.order, ...result });
+        notice(isDemo() ? 'Stop request acknowledged by the demo server. No hardware command was sent.' : 'Stop request acknowledged by the server. Inspect the arm before continuing.', true);
+      }
+      invalidatePlan();
+      announce('Stop request acknowledged.');
+    } catch (error) { notice(`Stop could not be confirmed: ${error.message} Use the physical stop button if the arm is moving.`); }
+    finally { button.disabled = false; render(); }
+  }
+
+  async function pollOrder() {
+    if (demo || state.busy) return;
+    try {
+      const order = await api('/api/orders/current');
+      state.pollFailures = 0;
+      if (order && order.status) {
+        const wasActive = !!activeOrder();
+        renderOrder(order);
+        if (wasActive && !activeOrder()) {
+          invalidatePlan();
+          announce(order.status === 'completed' || order.status === 'complete' ? 'Your bouquet is ready.' : `Order ${order.status}.`);
+          try { applyInventory(await api('/api/inventory')); } catch (error) { inventoryFailed(error); }
+        }
+      }
+    } catch (error) {
+      state.pollFailures += 1;
+      if (activeOrder()) notice(`Order updates are unavailable: ${error.message} The arm may still be moving; use the stop control if needed.`);
+    }
+  }
+
+  function demoInventory() {
+    return { mode: 'demo', ready: true, detected_at: new Date().toISOString(), blockers: [], colors: [
+      { color: 'red', label: 'Red roses', available: 6 }, { color: 'pink', label: 'Pink roses', available: 4 },
+      { color: 'white', label: 'White roses', available: 5 }, { color: 'yellow', label: 'Yellow roses', available: 3 },
+    ] };
+  }
+
+  function demoPlan() {
+    const blockers = state.colors.filter((item) => (state.quantities[item.color] || 0) > item.available).map((item) => `Only ${item.available} ${item.label.toLowerCase()} are in view.`);
+    return { ready: total() > 0 && !blockers.length, blockers, requested_total: total(), assignments: payload().items };
+  }
+
+  function startDemoOrder() {
+    const order = { id: 'preview', status: 'running', requested_total: total(), completed: 0, steps: ['Preview only: checking the bouquet.'] };
+    renderOrder(order);
+    state.demoTimer = window.setInterval(() => {
+      const completed = state.order.completed + 1;
+      renderOrder({ ...state.order, completed, status: completed >= order.requested_total ? 'completed' : 'running', steps: [...state.order.steps, `Preview: placed stem ${completed} in the vase.`] });
+      if (completed >= order.requested_total) { window.clearInterval(state.demoTimer); invalidatePlan(); renderSummary(); }
+    }, 1600);
+  }
+
+  $('scan-button').addEventListener('click', scan);
+  $('plan-button').addEventListener('click', checkPlan);
+  $('build-button').addEventListener('click', buildBouquet);
+  $('stop-button').addEventListener('click', stopArm);
+  $('clear-selection').addEventListener('click', () => { state.quantities = {}; invalidatePlan(); render(); announce('Bouquet selection cleared.'); });
+  $('selection-rule').addEventListener('change', () => { invalidatePlan(); renderSummary(); });
+  $('camera-preview').addEventListener('load', renderCameraOverlay);
+  $('camera-preview').addEventListener('error', () => { $('camera-view').hidden = true; });
+
+  async function init() {
+    render();
+    if (demo) {
+      $('demo-banner').hidden = false;
+      applyInventory(demoInventory());
+      state.quantities = { red: 2 };
+      render();
+      return;
+    }
+    try { applyInventory(await api('/api/inventory')); }
+    catch (error) { inventoryFailed(error); }
+    await pollOrder();
+    // Schedule after each request settles to avoid overlapping requests on a slow robot.
+    const poll = async () => { await pollOrder(); window.setTimeout(poll, 2000); };
+    window.setTimeout(poll, 2000);
+  }
+  init();
+})();

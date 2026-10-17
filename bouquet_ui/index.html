@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#183e33">
+  <meta name="description" content="Choose your roses, check the workbench, and let the flower robot arrange your bouquet one stem at a time.">
+  <title>Les Fleurs du Viam — Bouquet Studio</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="demo-banner" id="demo-banner" hidden>PREVIEW MODE <span>Sample inventory · no robot commands are sent</span></div>
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="wordmark" href="/" aria-label="Les Fleurs du Viam home">
+        <span class="brand-flower" aria-hidden="true">✳</span>
+        <span>Les Fleurs<span class="wordmark-sub">DU VIAM</span></span>
+      </a>
+      <div class="header-caption">A ROBOTIC FLORAL STUDIO<span>Made with a little human intention.</span></div>
+      <div class="connection-pill" id="connection-pill"><span class="status-dot"></span><span id="connection-label">Connecting</span></div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div class="intro-copy">
+          <p class="eyebrow"><span></span> FROM WORKBENCH TO BOUQUET</p>
+          <h1 id="page-title">Good things grow<br>one <em>stem</em> at a time.</h1>
+          <p class="intro-description">Pick your colors. Find your balance. Our robot brings your bouquet together, one rose at a time.</p>
+        </div>
+        <div class="botanical-art" aria-hidden="true">
+          <svg viewBox="0 0 460 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="242" cy="252" rx="109" ry="10" fill="#DEDCCD" opacity=".65"/>
+            <path d="M216 239C202 173 184 123 143 63M237 239C229 160 239 107 271 45M247 241C263 183 286 143 335 110M229 242C204 202 189 181 160 164" stroke="#4B6A4D" stroke-width="3" stroke-linecap="round"/>
+            <path d="M211 207C171 215 158 195 159 186C184 177 200 184 211 207ZM254 206C287 209 305 192 303 177C279 175 262 186 254 206ZM234 154C206 151 196 130 200 119C221 124 234 136 234 154ZM261 134C288 139 300 121 299 110C279 109 267 118 261 134ZM185 139C153 149 137 132 135 122C160 111 177 120 185 139Z" fill="#688468"/>
+            <path d="M212 222L207 193H263L257 222V247C245 254 224 254 212 247V222Z" fill="#E6CDAF" fill-opacity=".6" stroke="#B69C7E" stroke-width="1.4"/>
+            <path d="M212 223C224 229 245 229 258 222M219 200V242" stroke="#B69C7E" stroke-width="1" opacity=".5"/>
+            <g transform="translate(145 65) rotate(-24)">
+              <path d="M-1 31C-28 21-44 2-35-13C-26-28-12-18-8-14C-9-39 15-42 23-25C30-31 42-21 38-8C56 6 34 30 13 35Z" fill="#AB404B"/>
+              <path d="M-25-10C-30 9-8 24 10 25C-3 17-9 4-2-10C7-23 20-17 21-8C16-1 10 5 4 10M-2 22C19 27 36 14 34 2M-7-15C-2-5-3 5 4 10C13 11 27 2 21-8M4 10C4 17 6 21 10 25" stroke="#E1A5A6" stroke-opacity=".7" stroke-width="1.5" stroke-linecap="round"/>
+            </g>
+            <g transform="translate(273 49) rotate(16)">
+              <path d="M0 29C-24 24-41 2-31-11C-27-23-13-21-8-13C-8-35 13-39 23-23C32-27 39-18 34-7C48 11 27 31 12 33Z" fill="#D99996"/>
+              <path d="M-22-11C-25 7-7 21 10 24C-5 14-8 0 0-9C8-19 21-14 21-6C17 2 10 7 4 10M-1 22C17 25 33 14 31 1M-8-14C-5-4-3 4 4 10C14 10 25 0 21-6" stroke="#F6D7CA" stroke-width="1.5" stroke-linecap="round"/>
+            </g>
+            <g transform="translate(339 109) rotate(43)">
+              <path d="M0 28C-24 21-37 3-30-11C-24-23-12-19-7-13C-8-34 14-36 22-23C31-26 39-17 34-7C47 10 29 29 12 33Z" fill="#E9D8A4"/>
+              <path d="M-21-9C-25 7-8 21 9 23C-3 15-8 3-1-8C8-18 20-13 20-5C15 3 10 6 3 10M-2 22C17 24 32 13 31 0M-7-13C-5-3-4 5 3 10C13 11 24 0 20-5" stroke="#BEA46D" stroke-opacity=".65" stroke-width="1.5" stroke-linecap="round"/>
+            </g>
+            <g transform="translate(155 163) rotate(-47)">
+              <path d="M0 20C-19 15-27 0-20-9C-14-18-6-13-5-9C-5-25 11-26 16-16C24-20 28-9 23-4C32 8 18 24 8 24Z" fill="#F1EBDA" stroke="#C2BCA5"/>
+              <path d="M-15-7C-16 8 0 16 7 17C-4 8-6 1 0-6C7-12 14-9 14-4C10 2 5 6 1 7M1 7C9 11 20 5 21-1" stroke="#C2BCA5" stroke-width="1.2"/>
+            </g>
+            <path d="M349 47L354 38M368 62L379 58M332 30L333 18" stroke="#B6B79F" stroke-width="1.3" stroke-linecap="round"/>
+            <circle cx="115" cy="211" r="3" fill="#D99996"/><circle cx="379" cy="164" r="2" fill="#D99996"/>
+          </svg>
+          <span class="art-caption">a few stems, a thousand possibilities.</span>
+        </div>
+      </section>
+
+      <div class="notice" id="global-notice" role="status" hidden></div>
+
+      <div class="studio-grid">
+        <section class="selection-panel" aria-labelledby="selection-title">
+          <div class="section-heading"><div><p class="eyebrow">01 / THE PALETTE</p><h2 id="selection-title">Make it yours.</h2></div><span class="soft-tag">ROSES</span></div>
+          <p class="section-description">A single color or a little of everything. Choose up to 12 stems in total.</p>
+          <div class="flower-grid" id="flower-grid" aria-label="Rose color quantities"></div>
+          <div class="selection-footer"><span><span class="tiny-flower" aria-hidden="true">✳</span> Every rose is picked individually.</span><button class="text-button" id="clear-selection" type="button">Clear selection</button></div>
+
+          <div class="selection-rule"><label for="selection-rule">Choose stems by</label><select id="selection-rule"><option value="highest_confidence">Best vision confidence</option><option value="left_to_right">Left to right</option></select></div>
+
+          <section class="process-note" aria-label="How your bouquet is made">
+            <div class="process-icon" aria-hidden="true">↗</div>
+            <div><h3>A thoughtful little process.</h3><p>The camera finds available roses, the planner checks your selection, and the arm picks and places each stem into the vase.</p></div>
+          </section>
+        </section>
+
+        <aside class="order-panel" aria-label="Workbench and bouquet summary">
+          <section class="inventory-panel" aria-labelledby="inventory-title">
+            <div class="inventory-heading"><div><p class="eyebrow">02 / THE WORKBENCH</p><h2 id="inventory-title">Freshly in view.</h2></div><button class="icon-button" id="scan-button" type="button" aria-label="Scan rose inventory" title="Scan inventory"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 8A8 8 0 1 0 20 15M19 3V8H14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+            <div class="inventory-status"><span class="status-dot" id="inventory-dot"></span><span id="inventory-status-text">Waiting for the camera</span></div>
+            <div class="inventory-list" id="inventory-list"><p class="muted">Connect to the robot to see available stems.</p></div>
+            <div class="calibration-notice" id="calibration-notice" hidden><strong id="calibration-title">Workbench setup needed</strong><p id="detection-evidence" hidden></p><ul id="calibration-blockers"></ul></div>
+            <p class="inventory-time" id="inventory-time">Inventory is checked again before an order starts.</p>
+            <div class="camera-view" id="camera-view" hidden><img class="camera-preview" id="camera-preview" alt="Current workbench view with numbered stem detections"><svg class="camera-overlay" id="camera-overlay" aria-hidden="true"></svg></div>
+            <div class="candidate-list" id="candidate-list" hidden></div>
+          </section>
+
+          <section class="bouquet-summary" aria-labelledby="summary-title">
+            <div class="summary-heading"><h2 id="summary-title">Your bouquet</h2><span class="stem-total"><span id="stem-total">0</span> <span id="stem-unit">stems</span></span></div>
+            <div class="summary-items" id="summary-items"><p class="empty-summary">Something lovely starts with one rose.</p></div>
+            <div class="plan-result" id="plan-result" role="status" hidden></div>
+            <button class="button button-secondary" id="plan-button" type="button" disabled>Check my bouquet <span aria-hidden="true">↗</span></button>
+            <button class="button button-primary" id="build-button" type="button" disabled>Build my bouquet <span aria-hidden="true">→</span></button>
+            <p class="build-caption" id="build-caption">Choose your stems, then check the bouquet.</p>
+          </section>
+        </aside>
+      </div>
+
+      <section class="progress-panel" id="progress-panel" aria-labelledby="progress-title" hidden>
+        <div class="progress-heading"><div><p class="eyebrow">03 / COMING TOGETHER</p><h2 id="progress-title">One rose at a time.</h2></div><span id="progress-count">0 / 0 stems</span></div>
+        <div class="progress-track" role="progressbar" id="progress-track" aria-label="Bouquet completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-fill"></span></div>
+        <p id="progress-message" role="status">Preparing your bouquet.</p>
+        <p class="progress-verification" id="progress-verification" hidden></p>
+        <ol class="order-steps" id="order-steps"></ol>
+      </section>
+    </main>
+
+    <footer class="site-footer"><span>Designed by you. Arranged by Viam.</span><span class="footer-location">LES FLEURS DU VIAM <span>—</span> BOUQUET STUDIO</span><button class="stop-button" id="stop-button" type="button"><span aria-hidden="true"></span> Stop arm</button></footer>
+  </div>
+  <div class="sr-only" aria-live="polite" id="announcer"></div>
+</body>
+</html>
