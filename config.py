@@ -11,9 +11,34 @@ MOTION = "builtin"
 PLAN_CHECK = True  # dry-run every planned move and refuse it if there is no full plan
 PLAN_TIMEOUT_S = 30.0
 
-# Plan-checked 16 Oct over the vase, gripper down: wrist -15 makes the wrist hit the camera, -105 plans;
-# z 600 is the highest reachable point there.
-WRIST_DEG = -105.0
+# Gripper widths for the xArm module's DoCommand move_gripper (0 = closed, 850 = open).
+# Automated picking uses semantic Grab/Open; GRIP_STEM is for teleop.py's G key.
+GRIP_OPEN = 850
+GRIP_STEM = 120          # teleop.py's G key only; automated pick uses semantic Grab()
+GRIP_RELEASE_MARGIN = 150  # legacy direct-width release margin; semantic release uses Open()
+GRIP_SPEED = 1000        # of 5000; faster calibration/grasp, still below the module's 1500 default
+GRIP_EMPTY_MAX = 15      # a closed reading below this means the fingers met nothing
+GRIP_MAX_STEM_WIDTH = 300  # reject contact this wide; a single stem should not stop near-open jaws
+
+# Arm speed per move: quick in open air, slow within ~10 cm of the stem, pitcher or vase.
+FAST_DEG_S, SLOW_DEG_S, ACCEL_DEG_S2 = 40.0, 12.0, 150.0
+WRIST_DEG = -105.0       # plan-checked orientation; the saved pretend-loop poses use their captured orientations
+VASE_STEM_BELOW_GRIP_MM = 200.0  # held chopstick below the fingers; measure on the real stems
+VASE_DEPTH_MM = 250.0    # inside depth rim to floor: GUESS until measured with a ruler or a table touch
+VASE_FLOOR_Z = None      # set after one fingertip touch on the table; until then only the rim is used
+# Crossing height: the held stem's tip must clear the vase rim, not just the gripper.
+TRAVEL_Z = 420.0 + VASE_STEM_BELOW_GRIP_MM + 40.0
+
+STEMS = [
+    {"colour": "red", "length_mm": 450, "bloom_mm": 70},
+    {"colour": "red", "length_mm": 450, "bloom_mm": 70},
+    {"colour": "yellow", "length_mm": 450, "bloom_mm": 70},
+    {"colour": "yellow", "length_mm": 450, "bloom_mm": 70},
+    {"colour": "magenta", "length_mm": 450, "bloom_mm": 70},
+]
+LEAN_CANDIDATES_DEG = (0, 60, 120, 180, 240, 300)
+MIN_CLEARANCE_MM = 15.0
+RELEASE_ABOVE_RIM_MM = 100.0
 
 # Arm-measured 16 Oct: 4 rim touches fit a circle to +/-5 mm and agree on height to +/-4 mm.
 # The team's config puts the vase at (360, 234), top z ~242: reconcile before trusting either.
