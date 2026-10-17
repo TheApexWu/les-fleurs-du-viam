@@ -69,8 +69,17 @@ def sprites():
 
 
 def background(rng, size=640):
-    """Empty table: a single-flower photo with its flower painted out, randomly cropped and tinted."""
-    f = rng.choice(sorted((DATA / "single").glob("*.jpg")))
+    """Empty table: a single-flower photo with its flower painted out, or (30%) a real wrist-camera frame of
+    the board and hazard tape, so tape and glare are learned as background. Randomly cropped and tinted."""
+    negatives = sorted((DATA / "negatives").glob("*.jpg"))
+    if negatives and rng.random() < 0.3:
+        img = cv2.imread(str(rng.choice(negatives)))
+        h, w = img.shape[:2]
+        side = rng.randint(min(h, w) // 2, min(h, w))
+        x0, y0 = rng.randint(0, w - side), rng.randint(0, h - side)
+        crop = cv2.resize(img[y0:y0 + side, x0:x0 + side], (size, size))
+        return np.clip(crop.astype(np.float32) * rng.uniform(0.85, 1.15), 0, 255).astype(np.uint8)
+    f = rng.choice(sorted(p for p in (DATA / "single").glob("*.jpg") if "_cam" not in p.stem))
     img = cv2.imread(str(f))
     fm = flower_mask(img)
     bm = bloom_mask(img, fm)
