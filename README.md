@@ -1,5 +1,8 @@
 # Les Fleurs du Viam
 
+**Bouquet Studio frontend:** see [FRONTEND_HANDOFF.md](FRONTEND_HANDOFF.md) for
+local preview setup and instructions for the next contributor's agent.
+
 A robot arm that arranges flowers to express a feeling. You type "gratitude" or "grief", the arm places stems in a vase with heights and leans chosen to say it, and a vision model that never saw the request guesses the feeling from a photo.
 
 Viam hackathon, 16-17 Oct 2026, robot `armfarm12` (xArm, wrist camera, gripper).
