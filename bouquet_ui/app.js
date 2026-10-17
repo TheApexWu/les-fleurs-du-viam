@@ -5,17 +5,24 @@
   const demo = new URLSearchParams(window.location.search).get('demo') === '1';
   const MAX_ORDER_SIZE = 12;
   const $ = (id) => document.getElementById(id);
+  // Colours sampled from the stems on the workbench; one entry per variety and colour we stock.
   const palette = {
-    red: { label: 'Red roses', swatch: '#a34c58', background: '#f1e6e3', light: '#e0a2a7' },
-    pink: { label: 'Pink roses', swatch: '#d5969a', background: '#f3eae4', light: '#f9d6cd' },
-    white: { label: 'White roses', swatch: '#e8e3ce', background: '#f0f0e5', light: '#fffdf3' },
-    yellow: { label: 'Yellow roses', swatch: '#d5b66b', background: '#f3eedc', light: '#f8e8aa' },
-    orange: { label: 'Orange roses', swatch: '#cf8b63', background: '#f3e7dc', light: '#f4c29d' },
-    cyan: { label: 'Cyan roses', swatch: '#6faaa7', background: '#e6efea', light: '#bbdfd4' },
-    purple: { label: 'Purple roses', swatch: '#967496', background: '#eee7ed', light: '#d6b8d4' },
+    'rose:red': { label: 'Red rose', swatch: '#8f2531', background: '#f2e5e3', light: '#d9858d' },
+    'rose:pink': { label: 'Pink rose', swatch: '#c47fa0', background: '#f3e8ec', light: '#ecc2d3' },
+    'rose:yellow': { label: 'Yellow rose', swatch: '#e7c752', background: '#f5f0db', light: '#f7e6a4' },
+    'carnation:white': { label: 'White carnation', swatch: '#f2eee4', background: '#eef0e8', light: '#c9c3b2' },
+    'carnation:red-white': { label: 'Red & white carnation', swatch: '#f4ebe6', background: '#f2e8e6', light: '#c23a4b' },
+    'lily:orange': { label: 'Orange lily', swatch: '#e57a26', background: '#f5ebe0', light: '#f6b77f' },
+    'lily:yellow': { label: 'Yellow lily', swatch: '#e2d45a', background: '#f3f2df', light: '#c2b544' },
   };
+  const VARIETIES = [['rose', 'Roses'], ['carnation', 'Carnations'], ['lily', 'Lilies']];
+  const keyOf = (item) => `${item.variety || 'rose'}:${item.color}`;
+  const stock = () => Object.entries(palette).map(([key, theme]) => {
+    const [variety, color] = key.split(':');
+    return { variety, color, label: theme.label, available: null };
+  });
   const state = {
-    colors: ['red', 'pink', 'white', 'yellow'].map((color) => ({ color, label: palette[color].label, available: null })),
+    colors: stock(),
     quantities: {}, inventory: null, plan: null, order: null, busy: false, scanning: false,
     connected: false, pollFailures: 0, demoTimer: null,
   };
@@ -27,14 +34,36 @@
     return node;
   }
 
-  function styleFor(color) {
-    return palette[String(color).toLowerCase()] || { label: String(color), swatch: '#927e90', background: '#eee9e8', light: '#d9c6d3' };
+  function styleFor(item) {
+    return palette[keyOf(item)] || { label: `${item.color} ${item.variety || 'rose'}`, swatch: '#927e90', background: '#eee9e8', light: '#d9c6d3' };
   }
 
-  function roseArt(color) {
-    const theme = styleFor(color);
-    // Only controlled palette values enter SVG markup; resource labels use textContent.
-    return `<svg viewBox="0 0 110 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M53 109C54 88 53 66 56 41" stroke="#638164" stroke-width="2" stroke-linecap="round"/><path d="M54 86C39 89 29 80 28 71C42 70 51 76 54 86Z" fill="#7c9472"/><path d="M54 74C65 76 76 70 79 60C66 57 57 65 54 74Z" fill="#6f8d67"/><path d="M55 47C37 45 24 29 31 18C35 9 45 11 48 17C47 0 64-1 70 11C78 8 86 16 81 25C91 38 73 53 61 53Z" fill="${theme.swatch}" stroke="#0000000b"/><path d="M36 18C31 31 47 45 60 46C49 38 45 28 51 20C58 11 68 15 68 23C62 29 58 32 53 34M49 44C62 49 77 40 77 31M48 16C49 23 49 31 53 34C61 35 72 27 68 23M53 34C53 40 56 43 60 46" stroke="${theme.light}" stroke-opacity=".8" stroke-width="1.1" stroke-linecap="round"/></svg>`;
+  // Only controlled palette values enter SVG markup; resource labels use textContent.
+  const STEM = '<path d="M53 109C54 88 53 66 56 41" stroke="#638164" stroke-width="2" stroke-linecap="round"/><path d="M54 86C39 89 29 80 28 71C42 70 51 76 54 86Z" fill="#7c9472"/><path d="M54 74C65 76 76 70 79 60C66 57 57 65 54 74Z" fill="#6f8d67"/>';
+
+  function flowerArt(item) {
+    const theme = styleFor(item);
+    const variety = item.variety || 'rose';
+    if (variety === 'carnation') {
+      const frill = Array.from({ length: 14 }, (_, i) => {
+        const a = (i / 14) * Math.PI * 2;
+        return `${(56 + Math.cos(a) * 25).toFixed(1)},${(30 + Math.sin(a) * 22).toFixed(1)} ${(56 + Math.cos(a + 0.22) * 18).toFixed(1)},${(30 + Math.sin(a + 0.22) * 16).toFixed(1)}`;
+      }).join(' ');
+      const stripes = item.color === 'red-white' ? Array.from({ length: 10 }, (_, i) => {
+        const a = (i / 10) * Math.PI * 2;
+        return `<path d="M${(56 + Math.cos(a) * 9).toFixed(1)} ${(30 + Math.sin(a) * 8).toFixed(1)}L${(56 + Math.cos(a) * 24).toFixed(1)} ${(30 + Math.sin(a) * 21).toFixed(1)}" stroke="${theme.light}" stroke-width="1.6" stroke-linecap="round"/>`;
+      }).join('') : '';
+      return `<svg viewBox="0 0 110 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${STEM}<path d="M50 52L56 40L62 52Z" fill="#7c9472"/><polygon points="${frill}" fill="${theme.swatch}" stroke="${theme.light}" stroke-opacity=".55" stroke-width="1" stroke-linejoin="round"/>${stripes}<circle cx="56" cy="30" r="5" fill="${theme.light}" fill-opacity=".35"/></svg>`;
+    }
+    if (variety === 'lily') {
+      const petals = Array.from({ length: 6 }, (_, i) => `<path d="M56 32C51 22 52 8 56 0C60 8 61 22 56 32Z" fill="${theme.swatch}" stroke="${theme.light}" stroke-width="1" transform="rotate(${i * 60 + 30} 56 32)"/>`).join('');
+      return `<svg viewBox="0 0 110 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${STEM}${petals}<path d="M56 32L49 20M56 32L63 21M56 32L56 18" stroke="#a6612f" stroke-width="1.1" stroke-linecap="round"/><circle cx="49" cy="20" r="1.8" fill="#8a4a25"/><circle cx="63" cy="21" r="1.8" fill="#8a4a25"/><circle cx="56" cy="18" r="1.8" fill="#8a4a25"/></svg>`;
+    }
+    return roseArt(theme);
+  }
+
+  function roseArt(theme) {
+    return `<svg viewBox="0 0 110 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${STEM}<path d="M55 47C37 45 24 29 31 18C35 9 45 11 48 17C47 0 64-1 70 11C78 8 86 16 81 25C91 38 73 53 61 53Z" fill="${theme.swatch}" stroke="#0000000b"/><path d="M36 18C31 31 47 45 60 46C49 38 45 28 51 20C58 11 68 15 68 23C62 29 58 32 53 34M49 44C62 49 77 40 77 31M48 16C49 23 49 31 53 34C61 35 72 27 68 23M53 34C53 40 56 43 60 46" stroke="${theme.light}" stroke-opacity=".8" stroke-width="1.1" stroke-linecap="round"/></svg>`;
   }
 
   function total() {
@@ -67,7 +96,7 @@
 
   function payload() {
     return {
-      items: state.colors.filter((item) => state.quantities[item.color] > 0).map((item) => ({ color: item.color, quantity: state.quantities[item.color] })),
+      items: state.colors.filter((item) => state.quantities[keyOf(item)] > 0).map((item) => ({ variety: item.variety, color: item.color, quantity: state.quantities[keyOf(item)] })),
       rules: { selection: $('selection-rule').value },
     };
   }
@@ -102,14 +131,18 @@
     const grid = $('flower-grid');
     const focus = document.activeElement?.dataset?.control;
     grid.replaceChildren();
-    for (const item of state.colors) {
-      const quantity = state.quantities[item.color] || 0;
-      const theme = styleFor(item.color);
+    for (const [variety, heading] of VARIETIES) {
+      const group = state.colors.filter((item) => (item.variety || 'rose') === variety);
+      if (!group.length) continue;
+      grid.append(textElement('h3', heading, 'variety-heading'));
+    for (const item of group) {
+      const quantity = state.quantities[keyOf(item)] || 0;
+      const theme = styleFor(item);
       const label = item.label || theme.label;
       const card = textElement('article', '', `flower-card${quantity ? ' selected' : ''}`);
       card.style.setProperty('--flower-bg', theme.background);
       const picture = textElement('div', '', 'flower-picture');
-      picture.innerHTML = roseArt(item.color);
+      picture.innerHTML = flowerArt(item);
       picture.append(textElement('span', '✓', 'card-picked'));
       const body = textElement('div', '', 'flower-card-body');
       body.append(textElement('h3', label));
@@ -123,20 +156,21 @@
         }
         const button = textElement('button', symbol);
         button.type = 'button';
-        button.setAttribute('aria-label', `${action} one ${label.toLowerCase().replace(/roses$/, 'rose')}`);
-        button.dataset.control = `${item.color}:${delta}`;
+        button.setAttribute('aria-label', `${action} one ${label.toLowerCase()}`);
+        button.dataset.control = `${keyOf(item)}:${delta}`;
         button.disabled = !!activeOrder() || state.busy || (delta < 0 ? quantity === 0 : total() >= MAX_ORDER_SIZE);
         button.addEventListener('click', () => {
-          state.quantities[item.color] = Math.max(0, quantity + delta);
+          state.quantities[keyOf(item)] = Math.max(0, quantity + delta);
           invalidatePlan();
           render();
-          announce(`${state.quantities[item.color]} ${label.toLowerCase()} selected. ${total()} stems total.`);
+          announce(`${state.quantities[keyOf(item)]} × ${label.toLowerCase()} selected. ${total()} stems total.`);
         });
         controls.append(button);
       }
       body.append(controls);
       card.append(picture, body);
       grid.append(card);
+    }
     }
     if (focus) Array.from(grid.querySelectorAll('button')).find((button) => button.dataset.control === focus && !button.disabled)?.focus({ preventScroll: true });
   }
@@ -152,14 +186,14 @@
     $('stem-unit').textContent = count === 1 ? 'stem' : 'stems';
     const list = $('summary-items');
     list.replaceChildren();
-    for (const item of state.colors.filter((item) => state.quantities[item.color] > 0)) {
+    for (const item of state.colors.filter((item) => state.quantities[keyOf(item)] > 0)) {
       const row = textElement('div', '', 'summary-row');
       const dot = textElement('span', '', 'color-dot');
-      dot.style.setProperty('--swatch', styleFor(item.color).swatch);
-      row.append(dot, textElement('span', item.label || styleFor(item.color).label), textElement('span', `× ${state.quantities[item.color]}`, 'summary-quantity'));
+      dot.style.setProperty('--swatch', styleFor(item).swatch);
+      row.append(dot, textElement('span', item.label || styleFor(item).label), textElement('span', `× ${state.quantities[keyOf(item)]}`, 'summary-quantity'));
       list.append(row);
     }
-    if (!count) list.append(textElement('p', 'Something lovely starts with one rose.', 'empty-summary'));
+    if (!count) list.append(textElement('p', 'Something lovely starts with one stem.', 'empty-summary'));
     const running = !!activeOrder();
     $('clear-selection').disabled = running || state.busy || !count;
     $('selection-rule').disabled = running || state.busy;
@@ -178,14 +212,14 @@
     for (const item of state.colors) {
       const row = textElement('div', '', 'inventory-row');
       const dot = textElement('span', '', 'color-dot');
-      dot.style.setProperty('--swatch', styleFor(item.color).swatch);
-      row.append(dot, textElement('span', item.label || styleFor(item.color).label));
-      row.append(textElement('span', Number.isInteger(item.available) ? `${item.available} stems` : '—', 'inventory-count'));
+      dot.style.setProperty('--swatch', styleFor(item).swatch);
+      row.append(dot, textElement('span', item.label || styleFor(item).label));
+      row.append(textElement('span', Number.isInteger(item.available) ? `${item.available} stem${item.available === 1 ? '' : 's'}` : '—', 'inventory-count'));
       list.append(row);
     }
     const mode = isDemo() ? 'demo' : (state.connected && state.inventory?.mode === 'live' ? 'live' : 'offline');
     $('inventory-dot').className = `status-dot ${mode}`;
-    $('inventory-status-text').textContent = isDemo() ? 'Sample inventory · preview only' : state.scanning ? 'Looking for roses…' : mode === 'live' ? 'Live vision connected' : 'Live inventory unavailable';
+    $('inventory-status-text').textContent = isDemo() ? 'Sample inventory · preview only' : state.scanning ? 'Looking at the workbench…' : mode === 'live' ? 'Live vision connected' : 'Live inventory unavailable';
     const blockers = state.inventory?.blockers || [];
     const detectionCount = state.inventory?.raw_detection_count;
     const needsCalibration = !isDemo() && state.inventory && (!state.inventory.ready || blockers.length > 0);
@@ -194,7 +228,7 @@
     $('calibration-blockers').replaceChildren(...blockers.map((blocker) => textElement('li', blockerText(blocker))));
     if (needsCalibration && !blockers.length) $('calibration-blockers').append(textElement('li', 'Camera-to-table calibration and the grasp reference must be verified before an order can start.'));
     $('detection-evidence').hidden = !Number.isInteger(detectionCount);
-    $('detection-evidence').textContent = Number.isInteger(detectionCount) ? `${detectionCount} raw stem detection${detectionCount === 1 ? '' : 's'} · color and pick locations still need verification.` : '';
+    $('detection-evidence').textContent = Number.isInteger(detectionCount) ? `${detectionCount} raw flower detection${detectionCount === 1 ? '' : 's'} · pick locations still need verification.` : '';
     const detectedAt = state.inventory?.detected_at;
     const date = detectedAt ? new Date(typeof detectedAt === 'number' ? (detectedAt < 1e12 ? detectedAt * 1000 : detectedAt) : detectedAt) : null;
     $('inventory-time').textContent = date && !Number.isNaN(date.getTime()) ? `Last scan ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · checked again before building` : 'Inventory is checked again before an order starts.';
@@ -219,7 +253,7 @@
     candidates.slice(0, 6).forEach((candidate, index) => {
       const card = textElement('div', '', 'candidate-card');
       const heading = textElement('div', '', 'candidate-heading');
-      const color = candidate.color && candidate.color !== 'unknown' ? candidate.color : 'color unknown';
+      const color = [candidate.color && candidate.color !== 'unknown' ? candidate.color : 'color unknown', candidate.variety].filter(Boolean).join(' ');
       heading.append(textElement('strong', `${index + 1}. ${color}`));
       const score = Number.isFinite(candidate.confidence) ? `${Math.round(candidate.confidence * 100)}% · ` : '';
       heading.append(textElement('span', `${score}${candidate.pickable ? 'localized' : 'needs setup'}`));
@@ -271,14 +305,15 @@
     if (!snapshot || !Array.isArray(snapshot.colors)) throw new Error('The inventory response is missing its colors list.');
     state.inventory = snapshot;
     // An empty snapshot must not preserve quantities or imply old detections are current.
-    const colors = snapshot.colors.length ? snapshot.colors : ['red', 'pink', 'white', 'yellow'].map((color) => ({ color, label: palette[color].label, available: null }));
+    const colors = snapshot.colors.length ? snapshot.colors : stock();
     state.colors = colors.map((item) => ({
+      variety: String(item.variety || 'rose'),
       color: String(item.color),
-      label: String(item.label || styleFor(item.color).label),
+      label: String(item.label || styleFor(item).label),
       available: Number.isInteger(item.available) && item.available >= 0 ? item.available : null,
       confidence: item.confidence,
     }));
-    state.quantities = Object.fromEntries(state.colors.map((item) => [item.color, state.quantities[item.color] || 0]));
+    state.quantities = Object.fromEntries(state.colors.map((item) => [keyOf(item), state.quantities[keyOf(item)] || 0]));
     state.connected = demo || ['live', 'demo'].includes(snapshot.mode);
     invalidatePlan();
     $('demo-banner').hidden = !isDemo();
@@ -309,7 +344,7 @@
     try {
       if (demo) applyInventory(demoInventory());
       else applyInventory(await api('/api/scan', { method: 'POST' }));
-      announce('Rose inventory updated.');
+      announce('Workbench inventory updated.');
     } catch (error) { inventoryFailed(error); }
     finally { state.scanning = false; render(); }
   }
@@ -357,22 +392,22 @@
     $('progress-track').setAttribute('aria-valuenow', String(percent));
     $('progress-fill').style.width = `${percent}%`;
     const messages = {
-      pending: 'Checking the workbench and preparing your first rose.', queued: 'Your bouquet is queued.',
+      pending: 'Checking the workbench and preparing your first stem.', queued: 'Your bouquet is queued.',
       planning: 'Finding a path to the next stem.', running: 'Picking and placing one stem at a time.',
-      picking: 'Gently picking the next rose.', placing: 'Placing a rose into the vase.',
+      picking: 'Gently picking the next stem.', placing: 'Placing a stem into the vase.',
       completed: 'Your bouquet is ready. A little beauty, arranged.', complete: 'Your bouquet is ready. A little beauty, arranged.',
       failed: 'The arrangement stopped. Check the error before continuing.', error: 'The arrangement stopped. Check the error before continuing.',
       stopped: 'The arm was stopped. Inspect its position before starting another order.', stopping: 'Sending the stop command to the arm.',
       cancelled: 'The arrangement was cancelled.',
     };
-    $('progress-title').textContent = ['complete', 'completed'].includes(order.status) ? 'A little beauty, arranged.' : order.status === 'stopped' ? 'A moment to pause.' : 'One rose at a time.';
+    $('progress-title').textContent = ['complete', 'completed'].includes(order.status) ? 'A little beauty, arranged.' : order.status === 'stopped' ? 'A moment to pause.' : 'One stem at a time.';
     $('progress-message').textContent = order.error ? `${messages[order.status] || 'Order needs attention'} ${blockerText(order.error)}` : (messages[order.status] || `Order status: ${order.status}`);
     $('progress-verification').hidden = typeof order.verification !== 'string' || !order.verification;
     $('progress-verification').textContent = typeof order.verification === 'string' ? order.verification : '';
     const steps = $('order-steps');
     steps.replaceChildren();
     for (const step of (Array.isArray(order.steps) ? order.steps : []).slice(-6)) {
-      const message = typeof step === 'string' ? step : step.message || step.label || [step.color, step.stage || step.status].filter(Boolean).join(' · ');
+      const message = typeof step === 'string' ? step : step.message || step.label || [step.color, step.variety, step.stage || step.status].filter(Boolean).join(' · ');
       if (message) steps.append(textElement('li', String(message)));
     }
     renderFlowers();
@@ -438,14 +473,14 @@
   }
 
   function demoInventory() {
-    return { mode: 'demo', ready: true, detected_at: new Date().toISOString(), blockers: [], colors: [
-      { color: 'red', label: 'Red roses', available: 6 }, { color: 'pink', label: 'Pink roses', available: 4 },
-      { color: 'white', label: 'White roses', available: 5 }, { color: 'yellow', label: 'Yellow roses', available: 3 },
-    ] };
+    // What is actually on the workbench today.
+    const inView = { 'rose:yellow': 2, 'rose:red': 1, 'rose:pink': 1, 'carnation:white': 2, 'carnation:red-white': 2, 'lily:orange': 1, 'lily:yellow': 1 };
+    return { mode: 'demo', ready: true, detected_at: new Date().toISOString(), blockers: [],
+      colors: stock().map((item) => ({ ...item, available: inView[keyOf(item)] ?? 0 })) };
   }
 
   function demoPlan() {
-    const blockers = state.colors.filter((item) => (state.quantities[item.color] || 0) > item.available).map((item) => `Only ${item.available} ${item.label.toLowerCase()} are in view.`);
+    const blockers = state.colors.filter((item) => (state.quantities[keyOf(item)] || 0) > item.available).map((item) => `Only ${item.available} × ${item.label.toLowerCase()} in view.`);
     return { ready: total() > 0 && !blockers.length, blockers, requested_total: total(), assignments: payload().items };
   }
 
@@ -473,7 +508,7 @@
     if (demo) {
       $('demo-banner').hidden = false;
       applyInventory(demoInventory());
-      state.quantities = { red: 2 };
+      state.quantities = { 'rose:red': 1, 'carnation:white': 2, 'lily:orange': 1 };
       render();
       return;
     }

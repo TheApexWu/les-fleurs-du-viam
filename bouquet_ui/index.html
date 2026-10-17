@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#183e33">
-  <meta name="description" content="Choose your roses, check the workbench, and let the flower robot arrange your bouquet one stem at a time.">
+  <meta name="description" content="Choose roses, carnations and lilies, check the workbench, and let the flower robot arrange your bouquet one stem at a time.">
   <title>Les Fleurs du Viam — Bouquet Studio</title>
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/app.js" defer></script>
@@ -26,7 +26,7 @@
         <div class="intro-copy">
           <p class="eyebrow"><span></span> FROM WORKBENCH TO BOUQUET</p>
           <h1 id="page-title">Good things grow<br>one <em>stem</em> at a time.</h1>
-          <p class="intro-description">Pick your colors. Find your balance. Our robot brings your bouquet together, one rose at a time.</p>
+          <p class="intro-description">Roses, carnations, lilies. Pick your stems, find your balance, and the arm brings your bouquet together one stem at a time.</p>
         </div>
         <div class="botanical-art" aria-hidden="true">
           <svg viewBox="0 0 460 280" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -62,22 +62,22 @@
 
       <div class="studio-grid">
         <section class="selection-panel" aria-labelledby="selection-title">
-          <div class="section-heading"><div><p class="eyebrow">01 / THE PALETTE</p><h2 id="selection-title">Make it yours.</h2></div><span class="soft-tag">ROSES</span></div>
-          <p class="section-description">A single color or a little of everything. Choose up to 12 stems in total.</p>
-          <div class="flower-grid" id="flower-grid" aria-label="Rose color quantities"></div>
-          <div class="selection-footer"><span><span class="tiny-flower" aria-hidden="true">✳</span> Every rose is picked individually.</span><button class="text-button" id="clear-selection" type="button">Clear selection</button></div>
+          <div class="section-heading"><div><p class="eyebrow">01 / THE PALETTE</p><h2 id="selection-title">Make it yours.</h2></div><span class="soft-tag">3 VARIETIES · 7 STEMS</span></div>
+          <p class="section-description">One variety or a little of everything. Choose up to 12 stems in total.</p>
+          <div class="flower-grid" id="flower-grid" aria-label="Stem quantities by variety and colour"></div>
+          <div class="selection-footer"><span><span class="tiny-flower" aria-hidden="true">✳</span> Every stem is picked individually.</span><button class="text-button" id="clear-selection" type="button">Clear selection</button></div>
 
           <div class="selection-rule"><label for="selection-rule">Choose stems by</label><select id="selection-rule"><option value="highest_confidence">Best vision confidence</option><option value="left_to_right">Left to right</option></select></div>
 
           <section class="process-note" aria-label="How your bouquet is made">
             <div class="process-icon" aria-hidden="true">↗</div>
-            <div><h3>A thoughtful little process.</h3><p>The camera finds available roses, the planner checks your selection, and the arm picks and places each stem into the vase.</p></div>
+            <div><h3>A thoughtful little process.</h3><p>The camera recognises each flower and its colour, the planner checks your selection, and the arm picks and places each stem into the vase.</p></div>
           </section>
         </section>
 
         <aside class="order-panel" aria-label="Workbench and bouquet summary">
           <section class="inventory-panel" aria-labelledby="inventory-title">
-            <div class="inventory-heading"><div><p class="eyebrow">02 / THE WORKBENCH</p><h2 id="inventory-title">Freshly in view.</h2></div><button class="icon-button" id="scan-button" type="button" aria-label="Scan rose inventory" title="Scan inventory"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 8A8 8 0 1 0 20 15M19 3V8H14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+            <div class="inventory-heading"><div><p class="eyebrow">02 / THE WORKBENCH</p><h2 id="inventory-title">Freshly in view.</h2></div><button class="icon-button" id="scan-button" type="button" aria-label="Scan the workbench" title="Scan inventory"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 8A8 8 0 1 0 20 15M19 3V8H14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
             <div class="inventory-status"><span class="status-dot" id="inventory-dot"></span><span id="inventory-status-text">Waiting for the camera</span></div>
             <div class="inventory-list" id="inventory-list"><p class="muted">Connect to the robot to see available stems.</p></div>
             <div class="calibration-notice" id="calibration-notice" hidden><strong id="calibration-title">Workbench setup needed</strong><p id="detection-evidence" hidden></p><ul id="calibration-blockers"></ul></div>
@@ -88,7 +88,7 @@
 
           <section class="bouquet-summary" aria-labelledby="summary-title">
             <div class="summary-heading"><h2 id="summary-title">Your bouquet</h2><span class="stem-total"><span id="stem-total">0</span> <span id="stem-unit">stems</span></span></div>
-            <div class="summary-items" id="summary-items"><p class="empty-summary">Something lovely starts with one rose.</p></div>
+            <div class="summary-items" id="summary-items"><p class="empty-summary">Something lovely starts with one stem.</p></div>
             <div class="plan-result" id="plan-result" role="status" hidden></div>
             <button class="button button-secondary" id="plan-button" type="button" disabled>Check my bouquet <span aria-hidden="true">↗</span></button>
             <button class="button button-primary" id="build-button" type="button" disabled>Build my bouquet <span aria-hidden="true">→</span></button>
@@ -98,7 +98,7 @@
       </div>
 
       <section class="progress-panel" id="progress-panel" aria-labelledby="progress-title" hidden>
-        <div class="progress-heading"><div><p class="eyebrow">03 / COMING TOGETHER</p><h2 id="progress-title">One rose at a time.</h2></div><span id="progress-count">0 / 0 stems</span></div>
+        <div class="progress-heading"><div><p class="eyebrow">03 / COMING TOGETHER</p><h2 id="progress-title">One stem at a time.</h2></div><span id="progress-count">0 / 0 stems</span></div>
         <div class="progress-track" role="progressbar" id="progress-track" aria-label="Bouquet completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-fill"></span></div>
         <p id="progress-message" role="status">Preparing your bouquet.</p>
         <p class="progress-verification" id="progress-verification" hidden></p>
