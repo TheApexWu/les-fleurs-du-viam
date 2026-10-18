@@ -8,6 +8,13 @@
   python flowers.py restore_scan               return to the saved vision scan pose with planning checks
   python flowers.py grip_calibrate             check semantic Grab on one stem
   python flowers.py photo                      move to the taught photo pose and ask the critic
+  python flowers.py teach NAME                 save the current gripper pose under NAME
+  python flowers.py move_pose NAME             move slowly to one saved pretend-loop pose
+  python flowers.py open_gripper | grip_test   open, or test Grab on a stem held at a safe pose
+  python flowers.py go_hub                     move to the hub pose
+
+Earlier slot/kenzan routines, kept but not used by the bouquet flow:
+  pick SLOT, vase_one [SLOT] [LEAN_AZ], fill [N], insert_one, sogetsu
 
 Robot motion is plan-checked first when PLAN_CHECK is enabled. The pretend-loop poses are machine-specific.
 """
