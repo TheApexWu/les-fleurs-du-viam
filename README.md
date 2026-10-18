@@ -24,7 +24,7 @@ What the robot logs and the calibration files show (planner goals from armfarm12
 ## How it fits together
 
 - **Driving by hand.** `dashboard.py` (browser) and `teleop.py` (terminal) share `fleurs_core.py`: workspace limits, one move at a time, a per-move log and a 5 Hz trace. `viam_module/` packages the same logic as a Viam generic service.
-- **Planned motion.** `flowers.py` asks the builtin motion service for a plan without executing it (`motion.do_command({"plan": MoveRequest})`, rdk v1.12.0) and refuses the move if there is no full plan within 30 s. `pretend_loop` and `pick_and_drop` move through the five poses in `taught_poses.json`.
+- **Planned motion.** `flowers.py` asks the builtin motion service for a plan without executing it (`motion.do_command({"plan": MoveRequest})`, rdk v1.12.0) and refuses the move if there is no full plan within 30 s. `pretend_loop` and `pick_and_drop` move through five of the seven poses in `taught_poses.json`.
 - **Bouquet orders.** `bouquet.py serve` hosts `bouquet_ui/` and an order API. Each order is checked against stock (`bouquet_core.py`), then run one flower at a time (`bouquet_orders.py`): rescan, pick, release at the taught vase poses, check the source spot is empty.
 - **Vision.** Viam `vision-1` finds stems; `vision/flowers_detect.py` names the bloom's variety and colour from the same frame; `bouquet_markers.py` finds the yellow tape band that marks the grasp point; `bouquet_localization.py` projects it onto the measured table plane.
 - **Gates.** Physical orders need `--allow-motion` and a verified calibration or staged profile. Nothing in the committed state is verified, so the server stays read-only in practice.
