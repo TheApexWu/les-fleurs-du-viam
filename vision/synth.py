@@ -17,13 +17,6 @@ DATA = Path(__file__).parent / "data"
 CLASSES = ["rose", "carnation", "lily"]  # variety only; colour is read from pixels afterwards, so it can't be memorised
 
 
-def fill_holes(m):
-    filled = m.copy()
-    ff = np.zeros((m.shape[0] + 2, m.shape[1] + 2), np.uint8)
-    cv2.floodFill(filled, ff, (0, 0), 255)
-    return m | cv2.bitwise_not(filled)
-
-
 def sprites():
     """(rgb, alpha, bloom_alpha, class) for every cut-out. Hand-labelled heads (white on white, which no
     colour or texture rule finds reliably) come from single/boxes.json."""
