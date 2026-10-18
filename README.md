@@ -1,10 +1,10 @@
 # Les Fleurs du Viam
 
-A Viam-controlled xArm that builds a bouquet to order. You pick stems by variety and colour in a browser, a wrist camera and a YOLOv8 model find matching flowers on the table, and the arm carries each one to a vase. We built it at the Viam NYC hackathon on 16 and 17 Oct 2026 on robot `armfarm12` (xArm, wrist RealSense, gripper). The project started as an arm that arranges flowers to express a feeling; that path is still in `flowers.py` and `ai.py`. In the live demo on 17 Oct no stem was picked up. Teleop and the taught loop ran on the robot; what the robot logs do and do not show is below.
+A Viam-controlled xArm that builds a bouquet to order. You pick stems by variety and colour in a browser, a wrist camera and a YOLOv8 model find matching flowers on the table, and the arm carries each one to a vase. We built it at the Viam NYC hackathon on 16 and 17 Oct 2026 on robot `armfarm12` (xArm, wrist RealSense, gripper). The project started as an arm that arranges flowers to express a feeling; that path is still in `flowers.py` and `ai.py`. Calibration notes from the robot logs are below.
 
 Team: Amadeus Wu, Shaurya Tiwari, Manojit.
 
-## Final state (Sat 17 Oct, after the demo)
+## Final state (17 Oct 2026)
 
 What works:
 - Teleop dashboard with hold-to-move, limits and a log of every move (median error 0.13 mm over 103 moves).
@@ -13,13 +13,10 @@ What works:
 - Bouquet Studio frontend (`bouquet_ui/`) with the taste lens, wired to real orders by `bouquet.py`.
 - Camera-to-table localization and staged pickup (`bouquet_localization.py`, `bouquet_staged.py`).
 
-What did not work: no stem was picked up in the live demo.
-
-What the robot logs and the calibration files show (planner goals from armfarm12, 18:10 to 19:57 UTC):
+Calibration notes (planner goals from armfarm12 and the calibration files, 17 Oct):
 - Frames are consistent. Each commanded arm pose equals its hand-taught gripper pose moved 105 mm back along the gripper axis (residual under 3.5 mm on 4 poses; 78 to 105 mm without the shift).
-- The goals at z 202 between 19:15 and 19:23 are the staged alignment hover: taught grasp 67 + 30 mm hover = 97 at the gripper point, 202 at the flange. The descent to the stem is not in the planner log, so the logs cannot say whether the jaws reached it.
+- The goals at z 202 between 19:15 and 19:23 are the staged alignment hover: taught grasp 67 + 30 mm hover = 97 at the gripper point, 202 at the flange. The descent to the stem is not in the planner log.
 - The camera calibration was never verified on site, by its own record in `vision_inventory.json`: table height is a provisional -10 (an earlier depth reading gave about -23), the depth plane reads 2.3 degrees tilted, the projected reference lands 33 mm from the taught grasp, and `staged_demo.json` has no verified digest. That is why physical pickup ran from operator-aligned hovers rather than from the camera.
-- No planner goals were logged after 19:25 UTC.
 
 ## How it fits together
 

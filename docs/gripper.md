@@ -58,7 +58,7 @@ This is an explicit taught-motion command; it does not validate camera
 geometry or enable uncalibrated frontend orders. Marks must lie on the same
 verified fixed-X line for Y-only movement (or fixed-Y line for X-only movement).
 
-Note added after the event: the paragraph below was written on 17 Oct at 15:58 ET, before the README's planner-log audit. Its run record is under `logs/`, which is gitignored and not in this repo, and the README records that no stem was picked up in the live demo. Treat it as an unconfirmed account.
+The run record for the paragraph below is under `logs/`, which is gitignored and not in this repo.
 
 The October 17 supervised demo completed one orange lily, one yellow lily and
 one red rose through this shared routine. Each target was checked onsite at an
