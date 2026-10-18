@@ -1,12 +1,6 @@
-# Frontend handoff
+# Bouquet Studio frontend
 
-- Branch: `frontend/bouquet-studio`
-- Repository: <https://github.com/TheApexWu/les-fleurs-du-viam>
-- Base: `pretend-loop` at `fa8c8bd`.
-
-This branch contains the Bouquet Studio frontend and a standalone preview
-server. The bouquet backend, vision/localization work, and robot changes are
-being developed separately; `bouquet.py` is not included here.
+Plain HTML, CSS and JavaScript in `bouquet_ui/`, with no build step. Keep it that way: the `/static/` asset paths, the API contract, the visible preview label, plan-before-build gating, unknown (not stale) inventory on connection errors, and the always-visible Stop control are what the backend expects.
 
 ## Start on your machine
 
@@ -14,7 +8,7 @@ You need Git, Python 3.10 or newer, and a modern browser. There is no npm instal
 build step, virtual environment, API key, or robot connection for the preview.
 
 ```sh
-git clone --branch frontend/bouquet-studio https://github.com/TheApexWu/les-fleurs-du-viam.git
+git clone https://github.com/TheApexWu/les-fleurs-du-viam.git
 cd les-fleurs-du-viam
 python3 bouquet_ui/preview.py
 ```
@@ -22,25 +16,6 @@ python3 bouquet_ui/preview.py
 Open <http://127.0.0.1:8000/?demo=1>. On Windows, use
 `py -3 bouquet_ui/preview.py` if `python3` is unavailable. If port 8000 is busy,
 add `--port 8001` and open the printed URL. Stop the server with Ctrl+C.
-
-For an existing clean checkout:
-
-```sh
-git fetch origin
-git switch --track origin/frontend/bouquet-studio
-python3 bouquet_ui/preview.py
-```
-
-If the local branch already exists, use `git switch frontend/bouquet-studio`.
-Keep any existing local edits safe before changing branches. To work in a
-separate directory without switching your current checkout, use:
-
-```sh
-git fetch origin
-git worktree add -b frontend/my-bouquet-work ../fleurs-frontend origin/frontend/bouquet-studio
-cd ../fleurs-frontend
-python3 bouquet_ui/preview.py
-```
 
 The preview opens with two red roses selected and sample counts of red 6,
 pink 4, white 5, yellow 3. A visible **PREVIEW MODE** banner confirms that the
@@ -61,9 +36,7 @@ server maps those paths for you. Optional Google Fonts have local fallbacks.
 | `bouquet_ui/README.md` | Backend API contract and integrated behavior |
 | `bouquet_ui/preview.py` | Standard-library local static preview, bound to loopback |
 
-Read this guide, then `bouquet_ui/README.md`, then the three UI source files.
-The repository's root README mostly describes the robot workflow; its Python
-dependencies and hardware setup are unnecessary for frontend work.
+Frontend work needs none of the robot setup or Python dependencies.
 
 ## Check your changes
 
@@ -87,14 +60,14 @@ Node is optional. There is no frontend package manager or automated UI suite.
 
 ## Integration boundaries
 
-The client uses same-origin `/api/` requests. The future bouquet backend serves
+The client uses same-origin `/api/` requests. `bouquet.py serve` serves
 the page at `/` and assets at `/static/`; see the API contract in
 `bouquet_ui/README.md`. Keep those URLs and payloads compatible, or coordinate
 changes with the backend owner. `?demo=1` uses browser-side sample data and sends
 no API requests, including for scans, plans, orders, and stop.
 
-Backend `--demo` mode is a separate integration path described in the UI README;
-it requires the separately developed backend. The standalone preview does not
+`python bouquet.py serve --demo` runs the real backend against an in-memory
+inventory and exercises the API end to end. The standalone preview does not
 test backend polling, camera overlays, live inventory, or real stop handling.
 Use backend fixtures or a coordinated backend demo to verify those states.
 
@@ -103,16 +76,3 @@ interpretation, calibration, planning, and hardware commands. Build remains
 gated on an approved plan; disconnected inventory must not show stale counts.
 The demo stop only stops the animation. Leave hardware calibration and motion
 changes to the robot/backend owner.
-
-## Prompt for the next agent
-
-> You are working on `frontend/bouquet-studio` in les-fleurs-du-viam. Read
-> FRONTEND_HANDOFF.md and bouquet_ui/README.md first. Run
-> `python3 bouquet_ui/preview.py` and inspect the printed preview URL in a
-> browser before editing. Work on the requested frontend changes in
-> bouquet_ui/index.html, styles.css, and app.js. Preserve the plain-JavaScript
-> setup, API contract, preview labeling, plan gating, unknown-inventory
-> behavior, accessible controls, and responsive layout. Check the selection,
-> validation, preview progress, stop, and disconnected flows after editing.
-> Backend bouquet/vision modules are being developed separately and are absent
-> from this branch. Report changes, checks, and any integration dependencies.

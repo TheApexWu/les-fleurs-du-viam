@@ -1,9 +1,11 @@
 # Vision-guided bouquets
 
+Written 16 and 17 Oct during the event. The calibration state it describes is still what the committed `vision_inventory.json` holds: `reference.verified` is false.
+
 ## Current physical execution gates
 
 For the separately taught, resettable three-flower physical demonstration, see
-[STAGED_DEMO.md](STAGED_DEMO.md). It uses fixed robot poses, operator-assigned
+[staged-demo.md](staged-demo.md). It uses fixed robot poses, operator-assigned
 flower labels and fresh tape checks through the existing order runner. It does
 not enable free-table image-to-world motion. The new 50 mm rotation/withdrawal
 route requires onsite verification for both direct and API transfers.
@@ -127,8 +129,7 @@ Remove rulers/tools from the inventory area first. Startup and scanning do not
 move the arm. `--allow-motion` permits a validated order to execute; existing
 calibration, workspace, collision-planning and preview-correction gates still
 apply. Current onsite calibration remains unverified, so report the displayed
-blocker before any physical trial. This integration was written without running
-tests, as requested. `FLOWERS_CLASSIFIER=none` restores the legacy HSV preview.
+blocker before any physical trial. `FLOWERS_CLASSIFIER=none` restores the legacy HSV preview.
 
 The existing `python3 flowers.py pick_and_drop` still uses your working pickup and vase poses. The new bouquet app adds color/quantity selection, camera inventory, table localization, and a serialized order runner. It replaces only the three pickup poses; the captured vase approach/release remain the same.
 
@@ -273,9 +274,7 @@ Selection rules currently supported: highest detection confidence, or left-to-ri
 ## Offline checks
 
 ```sh
-python3 -m unittest discover -s tests -p 'test_bouquet*.py'
-python3 tests/test_geometry.py
-python3 tests/test_pure.py
+python -m pytest -q tests
 ```
 
 The tests use synthetic images, fake robot methods, and an in-memory demo backend. They cover two distinct red roses, projection/orientation math, stock shortages, duplicate detections, uncertain source clearance, cancellation, and refusal of physical execution in read-only mode.

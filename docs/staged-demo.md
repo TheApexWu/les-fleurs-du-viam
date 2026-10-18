@@ -1,5 +1,7 @@
 # Three-flower physical demo
 
+Written 17 Oct during the event. In the committed files `staged_demo.json` has no verified digest and `transfer_clearance.json` has `verified: false`, so a physical staged order is still blocked.
+
 This mode runs the frontend's normal plan/Build/order/Stop API against **three
 fixed, taught slots**: orange lily, yellow lily, red rose. Flower labels come
 from how you stage those slots. Camera pixels check the marks; they never
@@ -46,14 +48,17 @@ set +a
 For each flower, use the existing supervised dashboard/teleop controls to put
 the **open jaws** 30 mm above that mark. Use the taught grasp orientation and
 world Z **97.209441 mm**. Confirm from above that the jaws center over the tape.
+The taught grasp orientation is o_x 0.005754638, o_y -0.028685648,
+o_z -0.999571917, theta 101.425846 degrees. Confirm from above that the point
+between the fingertips sits over the tape grasp point.
 Keep the flower and its mark fixed throughout capture and all later builds.
 Then run the corresponding pair of capture commands:
 
 To read U/V values, run the staged server without `--allow-motion` and open
 **http://127.0.0.1:8770/?teach=1**. At scan, refresh and click the actual tape
 grasp point in the image. Its pixel coordinates appear above the camera; the
-click sends no motion command. Stop the server before positioning/capturing the
-next slot. Normal bouquet users do not see the teaching interaction.
+click sends no motion command. Stop the server with Ctrl+C before positioning/capturing the
+next slot; port 8770 must be free. Normal bouquet users do not see the teaching interaction.
 
 ```sh
 # At the operator-aligned orange-lily hover (reads only):
@@ -72,6 +77,11 @@ python bouquet_staged.py capture red-rose --hover-mm 30 --aligned
 python flowers.py restore_scan
 python bouquet_staged.py marker red-rose --pixel U_RED V_RED
 ```
+
+`capture` and `marker` never move the arm. `restore_scan` does. Do not run
+`init` again once slots are captured, and do not reuse pixels from a different
+flower arrangement. If any command reports an error, fix the cause; do not
+remove blockers by hand.
 
 Capture/marker commands never move the arm or jaws. They preserve the taught
 grasp Z/orientations, translate all three pickup poses together, and require a

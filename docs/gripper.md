@@ -1,8 +1,8 @@
 # Gripper and one-stem run
 
-Short checklist for repeating the gripper check and supervised flower transfer.
+Short checklist for repeating the gripper check and supervised flower transfer. Written 16 and 17 Oct during the event; the poses and numbers below are tied to armfarm12's table layout on those days.
 
-For the next vision-guided color/quantity workflow and selector UI, see [VISION_BOUQUET.md](VISION_BOUQUET.md). This manual remains the fixed-pickup baseline.
+For the next vision-guided color/quantity workflow and selector UI, see [vision-bouquet.md](vision-bouquet.md). This manual remains the fixed-pickup baseline.
 
 ## Before starting
 
@@ -41,7 +41,7 @@ The five captured waypoints are in `taught_poses.json`: `pickup_approach`, `pret
 The subsequent 50 mm clearance change now lifts at fixed grasp orientation
 before rotation and withdraws horizontally before rising from the vase. The
 new route has not been physically run. Direct and API transfers require onsite
-verification in `transfer_clearance.json`; see [STAGED_DEMO.md](STAGED_DEMO.md)
+verification in `transfer_clearance.json`; see [staged-demo.md](staged-demo.md)
 for the precise path, setup capture and frontend startup sequence.
 
 For an onsite-verified lateral offset from the taught pickup, the same routine
@@ -57,6 +57,8 @@ The grasp Z, full orientations, vase segment and final return are retained.
 This is an explicit taught-motion command; it does not validate camera
 geometry or enable uncalibrated frontend orders. Marks must lie on the same
 verified fixed-X line for Y-only movement (or fixed-Y line for X-only movement).
+
+Note added after the event: the paragraph below was written on 17 Oct at 15:58 ET, before the README's planner-log audit. Its run record is under `logs/`, which is gitignored and not in this repo, and the README records that no stem was picked up in the live demo. Treat it as an unconfirmed account.
 
 The October 17 supervised demo completed one orange lily, one yellow lily and
 one red rose through this shared routine. Each target was checked onsite at an
