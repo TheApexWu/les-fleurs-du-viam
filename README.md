@@ -1,6 +1,6 @@
 # Les Fleurs du Viam
 
-A Viam-controlled xArm that builds a bouquet to order. You pick stems by variety and colour in a browser, a wrist camera and a YOLOv8 model find matching flowers on the table, and the arm carries each one to a vase. We built it at the Viam NYC hackathon on 16 and 17 Oct 2026 on robot `armfarm12` (xArm, wrist RealSense, gripper). The project started as an arm that arranges flowers to express a feeling; that path is still in `flowers.py` and `ai.py`. In the live demo on 17 Oct no stem was picked up. The teleop, planning, taught loop, detector and UI all ran, and the robot logs below show where it stopped.
+A Viam-controlled xArm that builds a bouquet to order. You pick stems by variety and colour in a browser, a wrist camera and a YOLOv8 model find matching flowers on the table, and the arm carries each one to a vase. We built it at the Viam NYC hackathon on 16 and 17 Oct 2026 on robot `armfarm12` (xArm, wrist RealSense, gripper). The project started as an arm that arranges flowers to express a feeling; that path is still in `flowers.py` and `ai.py`. In the live demo on 17 Oct no stem was picked up. Teleop and the taught loop ran on the robot; what the robot logs do and do not show is below.
 
 Team: Amadeus Wu, Shaurya Tiwari, Manojit.
 
