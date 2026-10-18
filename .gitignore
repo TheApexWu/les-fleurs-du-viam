@@ -10,3 +10,6 @@ logs/
 vision/data/synth/
 vision/runs/
 *.pt.tmp
+.DS_Store
+vision/yolov8n.pt
+vision/data/oxford/
