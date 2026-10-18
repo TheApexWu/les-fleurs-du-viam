@@ -51,13 +51,17 @@ class FlowerFlowTests(unittest.IsolatedAsyncioTestCase):
         async def on_stage(stage):
             stages.append(stage)
 
-        with patch.object(K, "taught", return_value=original), redirect_stdout(io.StringIO()):
+        # Measured clearances live in repo state; pin them so the test does not depend on onsite sign-off.
+        clearance = {"pickup_clearance_z_mm": 400., "vase_retreat_xy_mm": [0., 50.]}
+        with patch.object(K, "taught", return_value=original), \
+             patch("flowers.transfer_clearance", return_value=clearance), redirect_stdout(io.StringIO()):
             await bot.pick_and_drop(override, on_stage=on_stage)
         actual = [call.args[0] for call in bot.move.await_args_list]
         self.assertEqual(actual[0].x, override["pickup_approach"]["x"])
         self.assertEqual(actual[1].x, override["pretend_grasp"]["x"])
-        self.assertEqual(actual[3].x, original["vase_approach"]["x"])
-        self.assertEqual(actual[4].x, original["pretend_release"]["x"])
+        self.assertEqual((actual[2].x, actual[2].z), (override["pretend_grasp"]["x"], 400.))
+        self.assertEqual(actual[4].x, original["vase_approach"]["x"])
+        self.assertEqual(actual[5].x, original["pretend_release"]["x"])
         self.assertLess(stages.index("grasped"), stages.index("released"))
         self.assertEqual(stages[-1], "returned")
         self.assertEqual(bot.grip.await_count, 1)
@@ -154,7 +158,7 @@ class ReadOnlyVisionTests(unittest.IsolatedAsyncioTestCase):
         calibration = default_calibration()
         calibration.update(image_size=[128, 72], scan_pose=pose(), scan_camera_pose=pose())
         snapshot = {"ready": False, "blockers": ["Unverified reference"], "candidates": [],
-                    "detections": [], "colors": [], "occupied_slot_ids": []}
+                    "detections": [], "blossoms": [], "colors": [], "occupied_slot_ids": []}
         with patch("bouquet_vision.load_calibration", return_value=calibration), \
              patch("bouquet_localization.table_inventory", return_value=snapshot) as table:
             result = await backend.scan()

@@ -69,14 +69,14 @@ class MarkerInventoryTests(unittest.TestCase):
         self.assertFalse(result["ready"])
         candidate = result["candidates"][0]
         self.assertIsNone(candidate["grasp_pixel"])
-        self.assertIn("exactly one", " ".join(candidate["blockers"]))
+        self.assertIn("Exactly one", " ".join(candidate["blockers"]))
 
     def test_two_bands_on_same_detected_stem_are_ambiguous(self):
         image = marked_image()
         ImageDraw.Draw(image).rectangle((76, 95, 84, 115), fill=(235, 190, 10))
         result = self.inventory(image)
         self.assertFalse(result["ready"])
-        self.assertIn("exactly one", " ".join(result["candidates"][0]["blockers"]))
+        self.assertIn("Exactly one", " ".join(result["candidates"][0]["blockers"]))
 
     def test_band_clipped_by_image_workspace_has_no_grasp_center(self):
         config = marked_calibration()
@@ -85,11 +85,19 @@ class MarkerInventoryTests(unittest.TestCase):
         self.assertFalse(result["ready"])
         self.assertIsNone(result["candidates"][0]["grasp_pixel"])
 
-    def test_detector_box_must_include_the_whole_band(self):
-        cut_box = {"bbox": [80, 65, 100, 220], "confidence": .9, "class_name": "stem"}
-        result = self.inventory(detections=[cut_box])
+    def test_band_outside_detector_box_needs_a_visible_stem_bridge(self):
+        upper_stem_box = {"bbox": [62, 65, 98, 120], "confidence": .9, "class_name": "stem"}
+        bridged = self.inventory(detections=[upper_stem_box])
+        self.assertTrue(bridged["ready"], bridged)
+        self.assertEqual(bridged["candidates"][0]["grasp_pixel"], [80, 151])
+
+        gap = marked_image()
+        ImageDraw.Draw(gap).rectangle((70, 108, 90, 128), fill="white")
+        upper_stem_box["bbox"] = [62, 65, 98, 100]
+        result = self.inventory(gap, detections=[upper_stem_box])
         self.assertFalse(result["ready"])
         self.assertIsNone(result["candidates"][0]["grasp_pixel"])
+        self.assertIn("Exactly one", " ".join(result["candidates"][0]["blockers"]))
 
     def test_full_rose_extent_must_fit_world_bounds(self):
         config = marked_calibration()

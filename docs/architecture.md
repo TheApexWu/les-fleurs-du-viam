@@ -1,6 +1,6 @@
 # How Les Fleurs du Viam works
 
-Diagrams render on GitHub. "Live" means read from armfarm12 on 16 Oct afternoon; "planned" means not built or not run yet.
+Diagrams render on GitHub. Sections 1 to 5 were written on 16 Oct and describe the machine as read from armfarm12 that afternoon; they are kept as a dated record. Section 6 is the bouquet stack added on 17 Oct. For what ran and what did not, see the README's final state.
 
 ## 1. The pieces and where they run
 
@@ -33,7 +33,7 @@ flowchart LR
     V["vase (generic, frame only)"]
     VIS["vision: yolo8-rose-detection,<br/>flower_color_detector-cyan/-orange"]
     DM["rose_logger (data manager)"]
-    MOD["fleurs teleop module<br/>(planned, viam_module/)"]
+    MOD["fleurs teleop module<br/>(viam_module/, smoke-tested offline,<br/>not deployed)"]
   end
 
   C -- "gRPC over WebRTC" --> ARM
@@ -64,7 +64,9 @@ flowchart LR
 
 **Open question:** our arm-measured vase is at (300, -283), rim z 420. The team's `vase` frame is at (360, 234). Either the vase moved to the +y side or one of the two is wrong. `config.VASE` must match where the vase actually is, or the obstacle box protects the wrong spot.
 
-## 3. One pick-and-place by replay (planned, not run yet)
+## 3. One pick-and-place by replay (16 Oct plan)
+
+This was the plan on 16 Oct. The loop that ran on 17 Oct went a different way: `flowers.py pretend_loop` and `pick_and_drop` move through the five poses saved in `taught_poses.json` (approach, grasp, lift, vase approach, release) with a plan-only check before each move. `replay.py` is still in the repo.
 
 ```mermaid
 sequenceDiagram
@@ -82,7 +84,7 @@ sequenceDiagram
   Note over R,A: any error or Ctrl-C calls arm.stop()
 ```
 
-## 4. Teleop to automation (the path we're on)
+## 4. Teleop to automation (16 Oct plan)
 
 ```mermaid
 flowchart LR
@@ -104,4 +106,29 @@ flowchart LR
 | Lean a vase allows | about 18-25° whatever the release angle | our model and a MuJoCo drop test, assumed vase depth |
 | Gripper vs placed stems | the gripper, not the flowers, limits the third stem | clearance model |
 
-What this means: top-down grabs can only carry a stem gripped close to its bottom. Roses with the bloom above the grip need the side grasp (gripper horizontal) that people naturally used in manual mode. That path is not plan-checked yet.
+What this means: top-down grabs can only carry a stem gripped close to its bottom. Roses with the bloom above the grip need the side grasp (gripper horizontal) that people naturally used in manual mode. That path was not plan-checked on 16 Oct.
+
+Other rules we worked by on 16 Oct:
+- A pose is the fingertip point: Viam reports the TCP, set 105 mm past the flange. The README's final state confirms commanded arm poses sit 105 mm back from the taught gripper poses.
+- Travel height while carrying = rim + stem length below the grip + about 4 cm, so trim stems and grip low.
+- The vase sets the lean (about atan(span / depth)); we choose only its direction.
+- The planner does not know about the held stem. Cross at travel height and descend along the stem's own line.
+- Grip is a set width, not a force. Strip leaves and thorns from the bottom of each stem so they do not snag.
+
+## 6. The bouquet stack (17 Oct)
+
+```mermaid
+flowchart LR
+  UI["bouquet_ui/<br/>browser selector, Stop"] -- "/api/inventory, /api/plan,<br/>/api/orders, /api/stop" --> B["bouquet.py serve<br/>:8770, read-only by default"]
+  B --> O["bouquet_orders.py<br/>one order at a time"]
+  O --> CORE["bouquet_core.py<br/>stock check, plan_order"]
+  O -- "free table" --> V["bouquet_vision.py<br/>Viam or demo inventory"]
+  O -- "staged demo" --> S["bouquet_staged.py<br/>three taught slots"]
+  V --> L["bouquet_localization.py<br/>camera ray to table plane"]
+  L --> M["bouquet_markers.py<br/>yellow grasp bands"]
+  V --> CL["bouquet_classifier.py<br/>variety + colour (vision/)"]
+  V --> FB["flowers.py FlowerBot.pick_and_drop<br/>grasp, clearance lift, vase release"]
+  S --> FB
+```
+
+Physical orders need `--allow-motion` plus a verified calibration (`vision_inventory.json`) or a verified staged profile (`staged_demo.json`), and a verified `transfer_clearance.json`. All three are unverified in the committed files. Details: [vision-bouquet.md](vision-bouquet.md), [staged-demo.md](staged-demo.md).

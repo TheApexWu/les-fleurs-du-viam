@@ -6,15 +6,15 @@ Rows carry `key` (for example `rose:yellow`), `variety`, `color`, `label`,
 include `variety`; omitting it means `rose`. Counts for yellow roses and yellow
 lilies are separate. Classification and stem localization use the same image.
 
-For local setup and the next agent's starting instructions, read
-[FRONTEND_HANDOFF.md](../FRONTEND_HANDOFF.md). For a standalone preview,
+For local setup and manual checks, read
+[docs/frontend.md](../docs/frontend.md). For a standalone preview,
 run `python3 bouquet_ui/preview.py` from the repository root and open
 <http://127.0.0.1:8000/?demo=1>. Python's standard library is sufficient.
 
 ## Integrated mode
 
 For a physical three-slot staged demonstration, use
-[`STAGED_DEMO.md`](../STAGED_DEMO.md). After onsite teaching/verification, start
+[`docs/staged-demo.md`](../docs/staged-demo.md). After onsite teaching/verification, start
 `python bouquet.py serve --staged-demo staged_demo.json --allow-motion`.
 The same payload, plan, Build, polling and Stop controls are used. This mode is
 visibly labeled as physical; variety/color labels come from operator-staged
