@@ -183,7 +183,7 @@ class OrderTests(unittest.TestCase):
         result = plan_order({"items": [{"color": "red", "quantity": 1}, {"color": "red", "quantity": 1}]}, inventory())
         self.assertTrue(result["ready"])
         self.assertEqual(result["requested_total"], 2)
-        self.assertEqual(result["items"], [{"color": "red", "quantity": 2}])
+        self.assertEqual(result["items"], [{"variety": "rose", "color": "red", "quantity": 2}])
 
     def test_left_to_right_is_deterministic(self):
         result = plan_order({"items": [{"color": "red", "quantity": 2}], "rules": {"selection": "left_to_right"}}, inventory())
